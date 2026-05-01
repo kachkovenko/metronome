@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Метроном">
+  <title>Метроном</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">Метроном</div>
+      <button id="menu-btn" class="icon-btn" aria-label="Меню">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="4" y1="7" x2="20" y2="7"/>
+          <line x1="4" y1="12" x2="20" y2="12"/>
+          <line x1="4" y1="17" x2="20" y2="17"/>
+        </svg>
+      </button>
+    </header>
+
+    <section class="bpm-card">
+      <div class="bpm-display">
+        <input id="bpm-input" type="number" min="30" max="300" value="100" inputmode="numeric">
+        <span class="bpm-label">BPM</span>
+      </div>
+      <input id="bpm-slider" type="range" min="30" max="300" value="100" step="1">
+      <div class="bpm-buttons">
+        <button class="bpm-step" data-delta="-5">−5</button>
+        <button class="bpm-step" data-delta="-1">−1</button>
+        <button class="bpm-step" data-delta="1">+1</button>
+        <button class="bpm-step" data-delta="5">+5</button>
+      </div>
+      <button id="tap-btn" class="tap-btn">TAP TEMPO</button>
+    </section>
+
+    <div class="row-cards">
+      <button class="mini-card" id="time-sig-btn" aria-label="Размер">
+        <div class="time-sig-display">
+          <span id="time-num-out">4</span>
+          <span class="slash">/</span>
+          <span id="time-den-out">4</span>
+        </div>
+      </button>
+      <button class="mini-card" id="sub-btn" aria-label="Деления">
+        <div class="sub-display" id="sub-symbol">♩</div>
+        <div class="mini-card-label" id="sub-label">четверти</div>
+      </button>
+    </div>
+
+    <section class="beat-card">
+      <div id="beat-indicator" class="beat-indicator"></div>
+    </section>
+
+    <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
+      <span class="play-icon">▶</span>
+      <span class="play-text">СТАРТ</span>
+    </button>
+    <p class="hint">Пробел — старт/стоп · T — tap tempo</p>
+
+    <footer class="footer-version">
+      <span id="app-version" class="version-label"></span>
+      <button id="update-btn" class="update-btn">Обновить</button>
+    </footer>
+  </main>
+
+  <div class="update-toast" id="update-toast"></div>
+
+  <!-- Side drawer -->
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <h2>Настройки</h2>
+      <button id="drawer-close" class="icon-btn" aria-label="Закрыть">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/>
+          <line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <details open>
+        <summary>Громкость</summary>
+        <div class="vol">
+          <label>Общая <output id="vol-master-out">70</output>%</label>
+          <input id="vol-master" type="range" min="0" max="100" value="70">
+        </div>
+        <div class="vol">
+          <label>Акцент (1-я доля) <output id="vol-accent-out">100</output>%</label>
+          <input id="vol-accent" type="range" min="0" max="100" value="100">
+        </div>
+        <div class="vol">
+          <label>Доля <output id="vol-beat-out">70</output>%</label>
+          <input id="vol-beat" type="range" min="0" max="100" value="70">
+        </div>
+        <div class="vol">
+          <label>Деление <output id="vol-sub-out">40</output>%</label>
+          <input id="vol-sub" type="range" min="0" max="100" value="40">
+        </div>
+      </details>
+
+      <details>
+        <summary>Speed Trainer</summary>
+        <p class="muted small">Темп будет автоматически расти каждые N тактов.</p>
+        <label class="toggle">
+          <input id="trainer-on" type="checkbox">
+          <span>Включить</span>
+        </label>
+        <div class="grid2">
+          <label>Старт BPM
+            <input id="trainer-start" type="number" min="30" max="300" value="80">
+          </label>
+          <label>Финал BPM
+            <input id="trainer-end" type="number" min="30" max="300" value="140">
+          </label>
+          <label>Шаг BPM
+            <input id="trainer-step" type="number" min="1" max="50" value="5">
+          </label>
+          <label>Каждые тактов
+            <input id="trainer-bars" type="number" min="1" max="32" value="4">
+          </label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Случайные пропуски</summary>
+        <p class="muted small">Случайно «выключает» доли — заставляет считать внутри.</p>
+        <label class="toggle">
+          <input id="mute-on" type="checkbox">
+          <span>Включить</span>
+        </label>
+        <label class="vol">Вероятность пропуска <output id="mute-pct-out">20</output>%
+          <input id="mute-pct" type="range" min="0" max="80" value="20">
+        </label>
+      </details>
+
+      <details>
+        <summary>Размер · точная настройка</summary>
+        <div class="row-inline">
+          <label>Числитель
+            <select id="time-num">
+              <option>1</option><option>2</option><option>3</option>
+              <option selected>4</option><option>5</option><option>6</option>
+              <option>7</option><option>8</option><option>9</option><option>12</option>
+            </select>
+          </label>
+          <label>Знаменатель
+            <select id="time-den">
+              <option>2</option><option selected>4</option><option>8</option><option>16</option>
+            </select>
+          </label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Пресеты</summary>
+        <div class="presets" id="builtin-presets"></div>
+        <div class="user-presets">
+          <input id="preset-name" type="text" placeholder="Название пресета" maxlength="30">
+          <button id="preset-save">Сохранить</button>
+        </div>
+        <div class="presets" id="user-presets"></div>
+      </details>
+
+      <p class="muted small drawer-foot">Установить как приложение: меню браузера → «Установить» / «На экран Домой»</p>
+    </div>
+  </aside>
+
+  <!-- Subdivision modal -->
+  <div id="sub-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Деления</h3>
+      <div class="sub-options">
+        <button class="sub-option" data-sub="1" data-symbol="♩" data-label="четверти">
+          <span class="sub-glyph">♩</span>
+          <span class="sub-name">Четверти</span>
+          <span class="sub-meta">1 удар на долю</span>
+        </button>
+        <button class="sub-option" data-sub="2" data-symbol="♫" data-label="восьмые">
+          <span class="sub-glyph">♫</span>
+          <span class="sub-name">Восьмые</span>
+          <span class="sub-meta">2 удара на долю</span>
+        </button>
+        <button class="sub-option" data-sub="3" data-symbol="♪³" data-label="триоли">
+          <span class="sub-glyph">♪³</span>
+          <span class="sub-name">Триоли</span>
+          <span class="sub-meta">3 удара на долю</span>
+        </button>
+        <button class="sub-option" data-sub="4" data-symbol="♬" data-label="шестнадцатые">
+          <span class="sub-glyph">♬</span>
+          <span class="sub-name">Шестнадцатые</span>
+          <span class="sub-meta">4 удара на долю</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time signature modal -->
+  <div id="time-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Размер</h3>
+      <div class="time-grid" id="time-grid"></div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
