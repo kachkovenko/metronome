@@ -35,7 +35,10 @@
         <input id="bpm-input" type="number" min="30" max="300" value="100" inputmode="numeric">
         <span class="bpm-label">BPM</span>
       </div>
-      <input id="bpm-slider" type="range" min="30" max="300" value="100" step="1">
+      <div id="bpm-wheel" class="bpm-wheel" role="slider" aria-label="BPM" aria-valuemin="30" aria-valuemax="300" aria-valuenow="100">
+        <div id="wheel-track" class="wheel-track"></div>
+        <div class="wheel-center"></div>
+      </div>
       <div class="bpm-buttons">
         <button class="bpm-step" data-delta="-5">−5</button>
         <button class="bpm-step" data-delta="-1">−1</button>

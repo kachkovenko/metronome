@@ -1,13 +1,15 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 
 const state = {
   bpm: 100,
   beatsPerMeasure: 4,
   beatUnit: 4,
   subdivision: 1,
+  // Per-beat type: 'accent' | 'beat' | 'soft' | 'mute'
+  beatTypes: ['accent', 'beat', 'beat', 'beat'],
   isPlaying: false,
   currentBeat: 0,
   currentSub: 0,
@@ -88,9 +90,10 @@ function playClick(type, time) {
   const gain = audioCtx.createGain();
 
   let freq, vol, dur;
-  if (type === 'accent') { freq = 1500; vol = state.volAccent; dur = 0.05; }
-  else if (type === 'beat') { freq = 900; vol = state.volBeat; dur = 0.05; }
-  else { freq = 600; vol = state.volSub; dur = 0.03; }
+  if (type === 'accent')      { freq = 1500; vol = state.volAccent;       dur = 0.05; }
+  else if (type === 'beat')   { freq = 900;  vol = state.volBeat;         dur = 0.05; }
+  else if (type === 'soft')   { freq = 700;  vol = state.volBeat * 0.5;   dur = 0.04; }
+  else                        { freq = 600;  vol = state.volSub;          dur = 0.03; }
 
   osc.type = 'square';
   osc.frequency.value = freq;
@@ -106,14 +109,14 @@ function playClick(type, time) {
 function scheduleNote(beat, sub, time) {
   notesInQueue.push({ beat, sub, time });
 
-  let type;
-  if (sub === 0) type = (beat === 0) ? 'accent' : 'beat';
-  else type = 'sub';
-
-  if (state.muteEnabled && sub === 0 && Math.random() * 100 < state.mutePct) {
-    return;
+  if (sub === 0) {
+    const beatType = state.beatTypes[beat] || 'beat';
+    if (beatType === 'mute') return;
+    if (state.muteEnabled && Math.random() * 100 < state.mutePct) return;
+    playClick(beatType, time);
+  } else {
+    playClick('sub', time);
   }
-  playClick(type, time);
 }
 
 function advance() {
@@ -188,31 +191,118 @@ function draw() {
 }
 
 function highlightBeat(beat) {
-  const dots = document.querySelectorAll('#beat-indicator .dot');
-  dots.forEach((d, i) => d.classList.toggle('active', i === beat));
+  document.querySelectorAll('.beat-stack').forEach((s, i) => {
+    s.classList.toggle('active', i === beat);
+  });
 }
 
 function clearBeatIndicator() {
-  document.querySelectorAll('#beat-indicator .dot').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.beat-stack').forEach(s => s.classList.remove('active'));
 }
 
+const BEAT_CYCLE = ['accent', 'beat', 'soft', 'mute'];
+
 function rebuildBeatIndicator() {
+  // Resize beatTypes preserving existing values
+  while (state.beatTypes.length < state.beatsPerMeasure) {
+    state.beatTypes.push('beat');
+  }
+  state.beatTypes.length = state.beatsPerMeasure;
+  if (state.beatTypes[0] === 'mute' || state.beatTypes[0] === 'soft') {
+    // first beat defaults to accent if newly resized; leave alone if user set it
+  }
+
   const el = $('beat-indicator');
   el.innerHTML = '';
   for (let i = 0; i < state.beatsPerMeasure; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'dot' + (i === 0 ? ' accent' : '');
-    el.appendChild(dot);
+    const stack = document.createElement('button');
+    stack.className = 'beat-stack';
+    stack.dataset.beat = i;
+    stack.dataset.type = state.beatTypes[i];
+    stack.setAttribute('aria-label', `Доля ${i + 1}: ${state.beatTypes[i]}`);
+    stack.innerHTML = '<span class="bdot"></span><span class="bdot"></span><span class="bdot"></span>';
+    stack.addEventListener('click', () => cycleBeat(i));
+    el.appendChild(stack);
+  }
+}
+
+function cycleBeat(i) {
+  const current = state.beatTypes[i];
+  const idx = BEAT_CYCLE.indexOf(current);
+  const next = BEAT_CYCLE[(idx + 1) % BEAT_CYCLE.length];
+  state.beatTypes[i] = next;
+  const stack = document.querySelector(`.beat-stack[data-beat="${i}"]`);
+  if (stack) {
+    stack.dataset.type = next;
+    stack.setAttribute('aria-label', `Доля ${i + 1}: ${next}`);
   }
 }
 
 // --- Display updaters ---
 
+// --- BPM wheel ---
+
+const BPM_MIN = 30;
+const BPM_MAX = 300;
+const TICK_PX = 8;
+let suppressWheelScroll = false;
+
+function buildBpmWheel() {
+  const track = $('wheel-track');
+  track.innerHTML = '';
+  for (let bpm = BPM_MIN; bpm <= BPM_MAX; bpm++) {
+    const tick = document.createElement('div');
+    let cls = 'wheel-tick';
+    if (bpm % 10 === 0) cls += ' major';
+    else if (bpm % 5 === 0) cls += ' mid';
+    tick.className = cls;
+    tick.dataset.bpm = bpm;
+    track.appendChild(tick);
+  }
+  // padding equal to half wheel width on each side, set inline so first/last reach center
+  applyWheelPadding();
+  scrollWheelToBpm(state.bpm, false);
+}
+
+function applyWheelPadding() {
+  const wheel = $('bpm-wheel');
+  const track = $('wheel-track');
+  const halfW = wheel.clientWidth / 2;
+  track.style.paddingLeft = halfW + 'px';
+  track.style.paddingRight = halfW + 'px';
+}
+
+function scrollWheelToBpm(bpm, smooth = true) {
+  const wheel = $('bpm-wheel');
+  if (!wheel) return;
+  const target = (bpm - BPM_MIN) * TICK_PX;
+  suppressWheelScroll = true;
+  wheel.scrollTo({ left: target, behavior: smooth ? 'smooth' : 'auto' });
+  // release after scroll settles
+  setTimeout(() => { suppressWheelScroll = false; }, smooth ? 350 : 50);
+}
+
+function onWheelScroll() {
+  if (suppressWheelScroll) return;
+  const wheel = $('bpm-wheel');
+  const idx = Math.round(wheel.scrollLeft / TICK_PX);
+  const bpm = Math.max(BPM_MIN, Math.min(BPM_MAX, BPM_MIN + idx));
+  if (bpm !== state.bpm) {
+    state.bpm = bpm;
+    $('bpm-input').value = bpm;
+    $('bpm-wheel').setAttribute('aria-valuenow', String(bpm));
+  }
+}
+
 function setBpm(v) {
-  v = Math.max(30, Math.min(300, Math.round(v)));
+  v = Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(v)));
   state.bpm = v;
   $('bpm-input').value = v;
-  $('bpm-slider').value = v;
+  const wheel = $('bpm-wheel');
+  if (wheel) {
+    wheel.setAttribute('aria-valuenow', String(v));
+    scrollWheelToBpm(v, true);
+  }
 }
 
 function updateSubDisplay() {
@@ -419,9 +509,46 @@ function buildTimeGrid() {
 
 function bind() {
   $('bpm-input').addEventListener('change', e => setBpm(Number(e.target.value)));
-  $('bpm-slider').addEventListener('input', e => setBpm(Number(e.target.value)));
   document.querySelectorAll('.bpm-step').forEach(b => {
     b.addEventListener('click', () => setBpm(state.bpm + Number(b.dataset.delta)));
+  });
+
+  // BPM wheel: native horizontal scroll (touch + trackpad horizontal)
+  const wheel = $('bpm-wheel');
+  wheel.addEventListener('scroll', onWheelScroll, { passive: true });
+
+  // Mouse wheel: translate vertical deltaY into horizontal scroll
+  wheel.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      wheel.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
+
+  // Click-and-drag on desktop (mouse). Touch already handled natively.
+  let dragStartX = 0;
+  let dragStartScroll = 0;
+  let isDragging = false;
+  wheel.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartScroll = wheel.scrollLeft;
+    wheel.classList.add('dragging');
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    wheel.scrollLeft = dragStartScroll - (e.clientX - dragStartX);
+  });
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    wheel.classList.remove('dragging');
+  });
+
+  // Recompute padding on viewport resize
+  window.addEventListener('resize', () => {
+    applyWheelPadding();
+    scrollWheelToBpm(state.bpm, false);
   });
 
   $('tap-btn').addEventListener('click', tap);
@@ -597,6 +724,8 @@ function init() {
   updateTimeDisplay();
   updatePlayButton();
   setupVersionAndUpdate();
+  // Wheel must build after layout settles so clientWidth is correct
+  requestAnimationFrame(buildBpmWheel);
 }
 
 init();

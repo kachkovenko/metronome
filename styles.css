@@ -119,41 +119,77 @@ button, input, select, textarea {
   font-weight: 500;
 }
 
-#bpm-slider {
-  width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
+/* BPM wheel — horizontal scrollable tick tape, same 32px height as the old slider */
+.bpm-wheel {
+  position: relative;
   height: 32px;
+  width: 100%;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  cursor: grab;
 }
 
-#bpm-slider::-webkit-slider-runnable-track {
+.bpm-wheel::-webkit-scrollbar { display: none; }
+
+.bpm-wheel.dragging { cursor: grabbing; }
+
+.wheel-track {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  /* padding handled inline by JS so first/last ticks can reach center */
+}
+
+.wheel-tick {
+  flex: 0 0 8px;
   height: 6px;
   background: var(--card-3);
-  border-radius: 3px;
+  scroll-snap-align: center;
+  border-radius: 1px;
+  margin-right: 0;
+  transform-origin: bottom;
 }
-#bpm-slider::-moz-range-track {
-  height: 6px;
-  background: var(--card-3);
-  border-radius: 3px;
+
+.wheel-tick.mid { height: 12px; background: var(--muted); }
+.wheel-tick.major { height: 22px; background: var(--fg); }
+
+/* Fade ticks toward edges */
+.bpm-wheel::before,
+.bpm-wheel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  pointer-events: none;
+  z-index: 2;
 }
-#bpm-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
+.bpm-wheel::before {
+  left: 0;
+  background: linear-gradient(to right, var(--card), transparent);
+}
+.bpm-wheel::after {
+  right: 0;
+  background: linear-gradient(to left, var(--card), transparent);
+}
+
+.wheel-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
   background: var(--accent);
-  margin-top: -10px;
-  border: none;
-  box-shadow: 0 0 16px rgba(213, 255, 60, 0.5);
-}
-#bpm-slider::-moz-range-thumb {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: none;
+  border-radius: 1px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  box-shadow: 0 0 12px rgba(213, 255, 60, 0.6);
+  z-index: 3;
 }
 
 .bpm-buttons {
@@ -254,11 +290,11 @@ button, input, select, textarea {
   letter-spacing: 0.04em;
 }
 
-/* Beat indicator */
+/* Beat indicator — Soundbrenner-style tappable stacks */
 .beat-card {
   background: var(--card);
   border-radius: var(--radius-md);
-  padding: 22px 16px;
+  padding: 16px 12px;
   margin-bottom: 14px;
   display: flex;
   justify-content: center;
@@ -266,34 +302,58 @@ button, input, select, textarea {
 
 .beat-indicator {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
-.dot {
-  width: 22px;
-  height: 22px;
+.beat-stack {
+  width: 44px;
+  height: 72px;
+  background: var(--card-2);
+  border: none;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
+}
+
+.beat-stack:active { transform: scale(0.95); }
+
+.beat-stack .bdot {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--card-3);
-  transition: background 0.05s ease, transform 0.05s ease, box-shadow 0.05s ease;
+  transition: background 0.06s ease, box-shadow 0.06s ease, transform 0.06s ease;
 }
 
-.dot.accent {
-  background: transparent;
-  border: 2px solid var(--accent);
-  box-sizing: border-box;
-}
+/* Lit pattern by beat type (top → bottom intensity, like Soundbrenner) */
+.beat-stack[data-type="accent"] .bdot { background: var(--accent); }
+.beat-stack[data-type="beat"]   .bdot:nth-child(2),
+.beat-stack[data-type="beat"]   .bdot:nth-child(3) { background: var(--fg); }
+.beat-stack[data-type="soft"]   .bdot:nth-child(3) { background: var(--muted); }
+/* mute = all dots dim */
+.beat-stack[data-type="mute"] { opacity: 0.45; }
 
-.dot.active {
-  background: var(--fg);
-  transform: scale(1.25);
-  box-shadow: 0 0 16px rgba(255,255,255,0.5);
+/* Active beat (currently playing) — flash background and slightly bump dots */
+.beat-stack.active {
+  background: var(--card-3);
 }
-
-.dot.accent.active {
-  background: var(--accent);
-  box-shadow: 0 0 24px rgba(213, 255, 60, 0.7);
+.beat-stack.active[data-type="accent"] {
+  background: var(--accent-soft);
+}
+.beat-stack.active .bdot {
+  transform: scale(1.15);
+}
+.beat-stack.active[data-type="accent"] .bdot {
+  box-shadow: 0 0 10px rgba(213, 255, 60, 0.7);
 }
 
 /* Play button — full-width pill, big yellow, like the FAB style adapted */
