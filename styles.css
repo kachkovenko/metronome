@@ -119,17 +119,15 @@ button, input, select, textarea {
   font-weight: 500;
 }
 
-/* BPM wheel — horizontal scrollable tick tape, same 32px height as the old slider */
+/* BPM wheel — horizontal scrollable tick tape */
 .bpm-wheel {
   position: relative;
-  height: 32px;
+  height: 72px;
   width: 100%;
   overflow-x: scroll;
   overflow-y: hidden;
-  scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
   cursor: grab;
 }
@@ -148,43 +146,42 @@ button, input, select, textarea {
 
 .wheel-tick {
   flex: 0 0 2px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.22);
+  height: 56px;
+  background: rgba(255, 255, 255, 0.28);
   border-radius: 1px;
-  scroll-snap-align: center;
 }
 
-/* Edge fades — wheel ticks emerge from / disappear into the card background */
+/* Edge fades — ticks dissolve into transparency on both sides */
 .bpm-wheel::before,
 .bpm-wheel::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 72px;
+  width: 100px;
   pointer-events: none;
   z-index: 2;
 }
 .bpm-wheel::before {
   left: 0;
-  background: linear-gradient(to right, var(--card) 0%, var(--card) 25%, transparent 100%);
+  background: linear-gradient(to right, var(--card), transparent);
 }
 .bpm-wheel::after {
   right: 0;
-  background: linear-gradient(to left, var(--card) 0%, var(--card) 25%, transparent 100%);
+  background: linear-gradient(to left, var(--card), transparent);
 }
 
 .wheel-center {
   position: absolute;
   left: 50%;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
   background: var(--accent);
-  border-radius: 1px;
+  border-radius: 2px;
   transform: translateX(-50%);
   pointer-events: none;
-  box-shadow: 0 0 12px rgba(213, 255, 60, 0.7);
+  box-shadow: 0 0 18px rgba(213, 255, 60, 0.8);
   z-index: 3;
 }
 
