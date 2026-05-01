@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 
 const state = {
   bpm: 100,
@@ -463,21 +463,23 @@ function saveCurrentAsPreset() {
   renderUserPresets();
 }
 
-// --- Drawer + modals ---
+// --- Tabs + modals ---
 
-function openDrawer() {
-  $('drawer').classList.add('open');
-  $('drawer').setAttribute('aria-hidden', 'false');
-  $('drawer-backdrop').hidden = false;
-  requestAnimationFrame(() => $('drawer-backdrop').classList.add('show'));
-}
+const TAB_TITLES = {
+  metronome: 'Метроном',
+  training: 'Тренировки',
+  settings: 'Настройки',
+};
 
-function closeDrawer() {
-  $('drawer').classList.remove('open');
-  $('drawer').setAttribute('aria-hidden', 'true');
-  const bd = $('drawer-backdrop');
-  bd.classList.remove('show');
-  setTimeout(() => { bd.hidden = true; }, 280);
+function switchTab(tabId) {
+  if (!TAB_TITLES[tabId]) return;
+  document.querySelectorAll('.tab-view').forEach(v => {
+    v.classList.toggle('active', v.dataset.tab === tabId);
+  });
+  document.querySelectorAll('.tab-bar-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tabId);
+  });
+  $('page-title').textContent = TAB_TITLES[tabId];
 }
 
 function openModal(id) {
@@ -589,10 +591,10 @@ function bind() {
   $('tap-btn').addEventListener('click', tap);
   $('play-btn').addEventListener('click', toggle);
 
-  // Drawer
-  $('menu-btn').addEventListener('click', openDrawer);
-  $('drawer-close').addEventListener('click', closeDrawer);
-  $('drawer-backdrop').addEventListener('click', closeDrawer);
+  // Bottom tab bar
+  document.querySelectorAll('.tab-bar-item').forEach(b => {
+    b.addEventListener('click', () => switchTab(b.dataset.tab));
+  });
 
   // Subdivision modal
   $('sub-btn').addEventListener('click', () => openModal('sub-modal'));
@@ -686,12 +688,7 @@ function bind() {
     if (state.autoBtLatency && state.isPlaying) detectBtLatency();
   });
 
-  // Sessions
-  $('open-sessions').addEventListener('click', () => {
-    closeDrawer();
-    openSessionsList();
-  });
-  $('sessions-close').addEventListener('click', closeSessionsList);
+  // Sessions / walkthrough
   $('walk-close').addEventListener('click', closeWalkthrough);
   $('walk-next').addEventListener('click', () => walkStep(+1));
   $('walk-prev').addEventListener('click', () => walkStep(-1));
@@ -707,7 +704,6 @@ function bind() {
     if (e.code === 'Space') { e.preventDefault(); toggle(); }
     else if (e.code === 'KeyT') { e.preventDefault(); tap(); }
     else if (e.code === 'Escape') {
-      closeDrawer();
       closeModal('sub-modal');
       closeModal('time-modal');
     }
@@ -859,34 +855,31 @@ async function loadSessions() {
     fetch(f).then(r => r.ok ? r.json() : null).catch(() => null)
   ));
   availableSessions = results.filter(Boolean);
+  renderSessionsList();
 }
 
-function openSessionsList() {
+function renderSessionsList() {
   const root = $('sessions-list');
+  if (!root) return;
   root.innerHTML = '';
   if (!availableSessions.length) {
     root.innerHTML = '<p class="muted">Тренировки не найдены.</p>';
-  } else {
-    availableSessions.forEach(s => {
-      const card = document.createElement('button');
-      card.className = 'session-card';
-      const blocksHtml = s.blocks.map(b =>
-        `<span>${b.title} · ${b.subtitle}</span>`
-      ).join('');
-      card.innerHTML = `
-        <div class="session-card-title">${s.title}</div>
-        <div class="session-card-sub">${s.subtitle}</div>
-        <div class="session-card-blocks">${blocksHtml}</div>
-      `;
-      card.addEventListener('click', () => startWalkthrough(s));
-      root.appendChild(card);
-    });
+    return;
   }
-  showFullscreen('sessions-screen');
-}
-
-function closeSessionsList() {
-  hideFullscreen('sessions-screen');
+  availableSessions.forEach(s => {
+    const card = document.createElement('button');
+    card.className = 'session-card';
+    const blocksHtml = s.blocks.map(b =>
+      `<span>${b.title} · ${b.subtitle}</span>`
+    ).join('');
+    card.innerHTML = `
+      <div class="session-card-title">${s.title}</div>
+      <div class="session-card-sub">${s.subtitle}</div>
+      <div class="session-card-blocks">${blocksHtml}</div>
+    `;
+    card.addEventListener('click', () => startWalkthrough(s));
+    root.appendChild(card);
+  });
 }
 
 function showFullscreen(id) {
@@ -915,7 +908,6 @@ function flattenSession(s) {
 }
 
 function startWalkthrough(session) {
-  closeSessionsList();
   walk = {
     session,
     exercises: flattenSession(session),

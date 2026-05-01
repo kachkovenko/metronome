@@ -20,198 +20,210 @@
 <body>
   <main class="app">
     <header class="topbar">
-      <div class="brand">Метроном</div>
-      <button id="menu-btn" class="icon-btn" aria-label="Меню">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <line x1="4" y1="7" x2="20" y2="7"/>
-          <line x1="4" y1="12" x2="20" y2="12"/>
-          <line x1="4" y1="17" x2="20" y2="17"/>
-        </svg>
-      </button>
+      <h1 class="page-title" id="page-title">Метроном</h1>
     </header>
 
-    <section class="bpm-card">
-      <div class="bpm-display">
-        <input id="bpm-input" type="number" min="30" max="300" value="100" inputmode="numeric">
-        <span class="bpm-label">BPM</span>
-      </div>
-      <div class="bpm-wheel-wrap">
-        <div id="bpm-wheel" class="bpm-wheel" role="slider" aria-label="BPM" aria-valuemin="30" aria-valuemax="300" aria-valuenow="100">
-          <div id="wheel-track" class="wheel-track"></div>
-        </div>
-        <div class="wheel-center"></div>
-      </div>
-      <div class="bpm-buttons">
-        <button class="bpm-step" data-delta="-5">−5</button>
-        <button class="bpm-step" data-delta="-1">−1</button>
-        <button class="bpm-step" data-delta="1">+1</button>
-        <button class="bpm-step" data-delta="5">+5</button>
-      </div>
-      <button id="tap-btn" class="tap-btn">TAP TEMPO</button>
-    </section>
+    <div class="tab-views">
+      <!-- Tab: Метроном -->
+      <section class="tab-view active" id="tab-metronome" data-tab="metronome">
+        <section class="bpm-card">
+          <div class="bpm-display">
+            <input id="bpm-input" type="number" min="30" max="300" value="100" inputmode="numeric">
+            <span class="bpm-label">BPM</span>
+          </div>
+          <div class="bpm-wheel-wrap">
+            <div id="bpm-wheel" class="bpm-wheel" role="slider" aria-label="BPM" aria-valuemin="30" aria-valuemax="300" aria-valuenow="100">
+              <div id="wheel-track" class="wheel-track"></div>
+            </div>
+            <div class="wheel-center"></div>
+          </div>
+          <div class="bpm-buttons">
+            <button class="bpm-step" data-delta="-5">−5</button>
+            <button class="bpm-step" data-delta="-1">−1</button>
+            <button class="bpm-step" data-delta="1">+1</button>
+            <button class="bpm-step" data-delta="5">+5</button>
+          </div>
+          <button id="tap-btn" class="tap-btn">TAP TEMPO</button>
+        </section>
 
-    <div class="row-cards">
-      <button class="mini-card" id="time-sig-btn" aria-label="Размер">
-        <div class="time-sig-display">
-          <span id="time-num-out">4</span>
-          <span class="slash">/</span>
-          <span id="time-den-out">4</span>
+        <div class="row-cards">
+          <button class="mini-card" id="time-sig-btn" aria-label="Размер">
+            <div class="time-sig-display">
+              <span id="time-num-out">4</span>
+              <span class="slash">/</span>
+              <span id="time-den-out">4</span>
+            </div>
+          </button>
+          <button class="mini-card" id="sub-btn" aria-label="Деления">
+            <div class="sub-display" id="sub-symbol">♩</div>
+            <div class="mini-card-label" id="sub-label">четверти</div>
+          </button>
         </div>
-      </button>
-      <button class="mini-card" id="sub-btn" aria-label="Деления">
-        <div class="sub-display" id="sub-symbol">♩</div>
-        <div class="mini-card-label" id="sub-label">четверти</div>
-      </button>
+
+        <section class="beat-card">
+          <div id="beat-indicator" class="beat-indicator"></div>
+        </section>
+
+        <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
+          <span class="play-icon">▶</span>
+          <span class="play-text">СТАРТ</span>
+        </button>
+        <p class="hint">Пробел — старт/стоп · T — tap tempo</p>
+      </section>
+
+      <!-- Tab: Тренировки -->
+      <section class="tab-view" id="tab-training" data-tab="training">
+        <div class="tab-section">
+          <h2 class="tab-section-title">Сессии</h2>
+          <div id="sessions-list" class="sessions-list"></div>
+        </div>
+
+        <div class="tab-section">
+          <h2 class="tab-section-title">Тренажёры темпа</h2>
+
+          <details>
+            <summary>Speed Trainer</summary>
+            <p class="muted small">Темп будет автоматически расти каждые N тактов.</p>
+            <label class="toggle">
+              <input id="trainer-on" type="checkbox">
+              <span>Включить</span>
+            </label>
+            <div class="grid2">
+              <label>Старт BPM
+                <input id="trainer-start" type="number" min="30" max="300" value="80">
+              </label>
+              <label>Финал BPM
+                <input id="trainer-end" type="number" min="30" max="300" value="140">
+              </label>
+              <label>Шаг BPM
+                <input id="trainer-step" type="number" min="1" max="50" value="5">
+              </label>
+              <label>Каждые тактов
+                <input id="trainer-bars" type="number" min="1" max="32" value="4">
+              </label>
+            </div>
+          </details>
+
+          <details>
+            <summary>Случайные пропуски</summary>
+            <p class="muted small">Случайно «выключает» доли — заставляет считать внутри.</p>
+            <label class="toggle">
+              <input id="mute-on" type="checkbox">
+              <span>Включить</span>
+            </label>
+            <label class="vol">Вероятность пропуска <output id="mute-pct-out">20</output>%
+              <input id="mute-pct" type="range" min="0" max="80" value="20">
+            </label>
+          </details>
+        </div>
+      </section>
+
+      <!-- Tab: Настройки -->
+      <section class="tab-view" id="tab-settings" data-tab="settings">
+        <details open>
+          <summary>Громкость</summary>
+          <div class="vol">
+            <label>Общая <output id="vol-master-out">70</output>%</label>
+            <input id="vol-master" type="range" min="0" max="100" value="70">
+          </div>
+          <div class="vol">
+            <label>Акцент (1-я доля) <output id="vol-accent-out">100</output>%</label>
+            <input id="vol-accent" type="range" min="0" max="100" value="100">
+          </div>
+          <div class="vol">
+            <label>Доля <output id="vol-beat-out">70</output>%</label>
+            <input id="vol-beat" type="range" min="0" max="100" value="70">
+          </div>
+          <div class="vol">
+            <label>Деление <output id="vol-sub-out">40</output>%</label>
+            <input id="vol-sub" type="range" min="0" max="100" value="40">
+          </div>
+        </details>
+
+        <details>
+          <summary>Задержка наушников</summary>
+          <p class="muted small">Если играешь в Bluetooth-наушниках, звук приходит с задержкой. Визуальный индикатор сдвигается позже, чтобы вспышка совпала с кликом в наушниках.</p>
+
+          <label class="toggle">
+            <input id="bt-auto" type="checkbox" checked>
+            <span>Автоопределение</span>
+          </label>
+          <p class="muted small bt-detected-line">При старте читаем <code>audioCtx.outputLatency</code>. Определено: <output id="bt-detected">—</output></p>
+
+          <div class="vol" id="bt-lag-row">
+            <label>Задержка <output id="bt-lag-out">0</output> мс</label>
+            <input id="bt-lag" type="range" min="0" max="400" step="5" value="0">
+          </div>
+          <div class="presets" id="bt-presets">
+            <button class="preset" data-bt-preset="0">Проводные</button>
+            <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
+            <button class="preset" data-bt-preset="200">AirPods</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Размер · точная настройка</summary>
+          <div class="row-inline">
+            <label>Числитель
+              <select id="time-num">
+                <option>1</option><option>2</option><option>3</option>
+                <option selected>4</option><option>5</option><option>6</option>
+                <option>7</option><option>8</option><option>9</option><option>12</option>
+              </select>
+            </label>
+            <label>Знаменатель
+              <select id="time-den">
+                <option>2</option><option selected>4</option><option>8</option><option>16</option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <details>
+          <summary>Пресеты</summary>
+          <div class="presets" id="builtin-presets"></div>
+          <div class="user-presets">
+            <input id="preset-name" type="text" placeholder="Название пресета" maxlength="30">
+            <button id="preset-save">Сохранить</button>
+          </div>
+          <div class="presets" id="user-presets"></div>
+        </details>
+
+        <p class="muted small">Установить как приложение: меню браузера → «Установить» / «На экран Домой»</p>
+
+        <footer class="footer-version">
+          <span id="app-version" class="version-label"></span>
+          <button id="update-btn" class="update-btn">Обновить</button>
+        </footer>
+      </section>
     </div>
 
-    <section class="beat-card">
-      <div id="beat-indicator" class="beat-indicator"></div>
-    </section>
-
-    <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
-      <span class="play-icon">▶</span>
-      <span class="play-text">СТАРТ</span>
-    </button>
-    <p class="hint">Пробел — старт/стоп · T — tap tempo</p>
+    <nav class="tab-bar" id="tab-bar">
+      <button class="tab-bar-item active" data-tab="metronome" aria-label="Метроном">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 3 L15 3 L19 21 L5 21 Z"/>
+          <line x1="11" y1="18" x2="14" y2="6"/>
+        </svg>
+        <span>Метроном</span>
+      </button>
+      <button class="tab-bar-item" data-tab="training" aria-label="Тренировки">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 11 L11 13 L15 9"/>
+          <rect x="4" y="4" width="16" height="16" rx="3"/>
+        </svg>
+        <span>Тренировки</span>
+      </button>
+      <button class="tab-bar-item" data-tab="settings" aria-label="Настройки">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span>Настройки</span>
+      </button>
+    </nav>
   </main>
 
   <div class="update-toast" id="update-toast"></div>
-
-  <!-- Side drawer -->
-  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
-  <aside id="drawer" class="drawer" aria-hidden="true">
-    <div class="drawer-head">
-      <h2>Настройки</h2>
-      <button id="drawer-close" class="icon-btn" aria-label="Закрыть">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <line x1="6" y1="6" x2="18" y2="18"/>
-          <line x1="18" y1="6" x2="6" y2="18"/>
-        </svg>
-      </button>
-    </div>
-
-    <div class="drawer-body">
-      <button id="open-sessions" class="drawer-cta">
-        <span class="cta-emoji">🥁</span>
-        <span class="cta-text">
-          <span class="cta-title">Тренировки</span>
-          <span class="cta-sub">План сессии с автонастройкой метронома</span>
-        </span>
-        <span class="cta-arrow">→</span>
-      </button>
-
-      <details>
-        <summary>Задержка наушников</summary>
-        <p class="muted small">Если играешь в Bluetooth-наушниках, звук приходит с задержкой. Визуальный индикатор сдвигается позже, чтобы вспышка совпала с кликом в наушниках.</p>
-
-        <label class="toggle">
-          <input id="bt-auto" type="checkbox" checked>
-          <span>Автоопределение</span>
-        </label>
-        <p class="muted small bt-detected-line">При старте читаем <code>audioCtx.outputLatency</code>. Определено: <output id="bt-detected">—</output></p>
-
-        <div class="vol" id="bt-lag-row">
-          <label>Задержка <output id="bt-lag-out">0</output> мс</label>
-          <input id="bt-lag" type="range" min="0" max="400" step="5" value="0">
-        </div>
-        <div class="presets" id="bt-presets">
-          <button class="preset" data-bt-preset="0">Проводные</button>
-          <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
-          <button class="preset" data-bt-preset="200">AirPods</button>
-        </div>
-      </details>
-
-      <details open>
-        <summary>Громкость</summary>
-        <div class="vol">
-          <label>Общая <output id="vol-master-out">70</output>%</label>
-          <input id="vol-master" type="range" min="0" max="100" value="70">
-        </div>
-        <div class="vol">
-          <label>Акцент (1-я доля) <output id="vol-accent-out">100</output>%</label>
-          <input id="vol-accent" type="range" min="0" max="100" value="100">
-        </div>
-        <div class="vol">
-          <label>Доля <output id="vol-beat-out">70</output>%</label>
-          <input id="vol-beat" type="range" min="0" max="100" value="70">
-        </div>
-        <div class="vol">
-          <label>Деление <output id="vol-sub-out">40</output>%</label>
-          <input id="vol-sub" type="range" min="0" max="100" value="40">
-        </div>
-      </details>
-
-      <details>
-        <summary>Speed Trainer</summary>
-        <p class="muted small">Темп будет автоматически расти каждые N тактов.</p>
-        <label class="toggle">
-          <input id="trainer-on" type="checkbox">
-          <span>Включить</span>
-        </label>
-        <div class="grid2">
-          <label>Старт BPM
-            <input id="trainer-start" type="number" min="30" max="300" value="80">
-          </label>
-          <label>Финал BPM
-            <input id="trainer-end" type="number" min="30" max="300" value="140">
-          </label>
-          <label>Шаг BPM
-            <input id="trainer-step" type="number" min="1" max="50" value="5">
-          </label>
-          <label>Каждые тактов
-            <input id="trainer-bars" type="number" min="1" max="32" value="4">
-          </label>
-        </div>
-      </details>
-
-      <details>
-        <summary>Случайные пропуски</summary>
-        <p class="muted small">Случайно «выключает» доли — заставляет считать внутри.</p>
-        <label class="toggle">
-          <input id="mute-on" type="checkbox">
-          <span>Включить</span>
-        </label>
-        <label class="vol">Вероятность пропуска <output id="mute-pct-out">20</output>%
-          <input id="mute-pct" type="range" min="0" max="80" value="20">
-        </label>
-      </details>
-
-      <details>
-        <summary>Размер · точная настройка</summary>
-        <div class="row-inline">
-          <label>Числитель
-            <select id="time-num">
-              <option>1</option><option>2</option><option>3</option>
-              <option selected>4</option><option>5</option><option>6</option>
-              <option>7</option><option>8</option><option>9</option><option>12</option>
-            </select>
-          </label>
-          <label>Знаменатель
-            <select id="time-den">
-              <option>2</option><option selected>4</option><option>8</option><option>16</option>
-            </select>
-          </label>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пресеты</summary>
-        <div class="presets" id="builtin-presets"></div>
-        <div class="user-presets">
-          <input id="preset-name" type="text" placeholder="Название пресета" maxlength="30">
-          <button id="preset-save">Сохранить</button>
-        </div>
-        <div class="presets" id="user-presets"></div>
-      </details>
-
-      <p class="muted small drawer-foot">Установить как приложение: меню браузера → «Установить» / «На экран Домой»</p>
-
-      <footer class="footer-version">
-        <span id="app-version" class="version-label"></span>
-        <button id="update-btn" class="update-btn">Обновить</button>
-      </footer>
-    </div>
-  </aside>
 
   <!-- Subdivision modal -->
   <div id="sub-modal" class="modal" aria-hidden="true">
@@ -251,22 +263,6 @@
       <div class="sheet-handle"></div>
       <h3>Размер</h3>
       <div class="time-grid" id="time-grid"></div>
-    </div>
-  </div>
-
-  <!-- Sessions list (full-screen overlay) -->
-  <div id="sessions-screen" class="fullscreen" aria-hidden="true">
-    <header class="fs-header">
-      <button class="icon-btn" id="sessions-close" aria-label="Закрыть">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
-        </svg>
-      </button>
-      <h2>Тренировки</h2>
-      <div></div>
-    </header>
-    <div class="fs-body">
-      <div id="sessions-list" class="sessions-list"></div>
     </div>
   </div>
 
