@@ -91,6 +91,29 @@
     </div>
 
     <div class="drawer-body">
+      <button id="open-sessions" class="drawer-cta">
+        <span class="cta-emoji">🥁</span>
+        <span class="cta-text">
+          <span class="cta-title">Тренировки</span>
+          <span class="cta-sub">План сессии с автонастройкой метронома</span>
+        </span>
+        <span class="cta-arrow">→</span>
+      </button>
+
+      <details>
+        <summary>Задержка наушников</summary>
+        <p class="muted small">Если играешь в Bluetooth-наушниках, звук приходит с задержкой. Слайдер двигает визуальный индикатор позже, чтобы вспышка совпала с кликом, который ты слышишь. Подбирай на слух при включённом метрономе.</p>
+        <div class="vol">
+          <label>Задержка <output id="bt-lag-out">0</output> мс</label>
+          <input id="bt-lag" type="range" min="0" max="400" step="5" value="0">
+        </div>
+        <div class="presets">
+          <button class="preset" data-bt-preset="0">Проводные</button>
+          <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
+          <button class="preset" data-bt-preset="200">AirPods</button>
+        </div>
+      </details>
+
       <details open>
         <summary>Громкость</summary>
         <div class="vol">
@@ -222,6 +245,72 @@
       <h3>Размер</h3>
       <div class="time-grid" id="time-grid"></div>
     </div>
+  </div>
+
+  <!-- Sessions list (full-screen overlay) -->
+  <div id="sessions-screen" class="fullscreen" aria-hidden="true">
+    <header class="fs-header">
+      <button class="icon-btn" id="sessions-close" aria-label="Закрыть">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+      <h2>Тренировки</h2>
+      <div></div>
+    </header>
+    <div class="fs-body">
+      <div id="sessions-list" class="sessions-list"></div>
+    </div>
+  </div>
+
+  <!-- Walkthrough screen -->
+  <div id="walk-screen" class="fullscreen" aria-hidden="true">
+    <header class="fs-header">
+      <button class="icon-btn" id="walk-close" aria-label="Закрыть">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+      <div class="walk-progress">
+        <span id="walk-block-name"></span>
+        <span class="walk-step muted" id="walk-step-info"></span>
+      </div>
+      <div></div>
+    </header>
+    <div class="fs-body walk-body">
+      <h1 id="walk-title"></h1>
+      <p id="walk-instructions" class="walk-instructions"></p>
+
+      <div class="walk-meta">
+        <div class="walk-meta-item">
+          <span class="walk-meta-label">Темп</span>
+          <span class="walk-meta-value"><span id="walk-bpm">100</span> BPM</span>
+        </div>
+        <div class="walk-meta-item">
+          <span class="walk-meta-label">Размер</span>
+          <span class="walk-meta-value" id="walk-timesig">4 / 4</span>
+        </div>
+        <div class="walk-meta-item">
+          <span class="walk-meta-label">Деления</span>
+          <span class="walk-meta-value" id="walk-sub">♫</span>
+        </div>
+      </div>
+
+      <div id="walk-sticking" class="walk-sticking"></div>
+      <div id="walk-groove" class="walk-groove"></div>
+      <p id="walk-tip" class="walk-tip muted"></p>
+
+      <div class="walk-timer">
+        <div class="walk-timer-bar"><div class="walk-timer-bar-fill" id="walk-timer-fill"></div></div>
+        <div class="walk-timer-text" id="walk-timer-text">0:00</div>
+      </div>
+    </div>
+    <footer class="walk-actions">
+      <button class="walk-btn" id="walk-prev">←</button>
+      <button class="walk-btn" id="walk-bpm-down">−5 BPM</button>
+      <button class="walk-btn" id="walk-bpm-up">+5 BPM</button>
+      <button class="walk-btn primary" id="walk-next">Дальше →</button>
+    </footer>
   </div>
 
   <script src="./app.js"></script>

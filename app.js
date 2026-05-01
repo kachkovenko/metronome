@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.1.0';
 
 const state = {
   bpm: 100,
@@ -28,7 +28,13 @@ const state = {
 
   muteEnabled: false,
   mutePct: 20,
+
+  // Bluetooth output latency (ms). Visual indicator is delayed by this much
+  // so the flash matches when the click actually arrives in the listener's ear.
+  btLatencyMs: 0,
 };
+
+const BT_LATENCY_KEY = 'metronome.bt-latency-ms';
 
 let audioCtx = null;
 let silentAudio = null;
@@ -183,7 +189,10 @@ function toggle() {
 function draw() {
   if (!state.isPlaying) return;
   const now = audioCtx.currentTime;
-  while (notesInQueue.length && notesInQueue[0].time <= now) {
+  // Delay visual flash by btLatencyMs so it lines up with what the listener
+  // actually hears through their (potentially Bluetooth) headphones.
+  const visualOffset = state.btLatencyMs / 1000;
+  while (notesInQueue.length && notesInQueue[0].time + visualOffset <= now) {
     const n = notesInQueue.shift();
     if (n.sub === 0) highlightBeat(n.beat);
   }
@@ -640,6 +649,36 @@ function bind() {
     $('mute-pct-out').value = state.mutePct;
   });
 
+  // Bluetooth latency
+  const btLag = $('bt-lag');
+  const btLagOut = $('bt-lag-out');
+  btLag.addEventListener('input', () => {
+    state.btLatencyMs = Number(btLag.value);
+    btLagOut.value = state.btLatencyMs;
+    localStorage.setItem(BT_LATENCY_KEY, String(state.btLatencyMs));
+  });
+  document.querySelectorAll('[data-bt-preset]').forEach(b => {
+    b.addEventListener('click', () => {
+      const v = Number(b.dataset.btPreset);
+      state.btLatencyMs = v;
+      btLag.value = v;
+      btLagOut.value = v;
+      localStorage.setItem(BT_LATENCY_KEY, String(v));
+    });
+  });
+
+  // Sessions
+  $('open-sessions').addEventListener('click', () => {
+    closeDrawer();
+    openSessionsList();
+  });
+  $('sessions-close').addEventListener('click', closeSessionsList);
+  $('walk-close').addEventListener('click', closeWalkthrough);
+  $('walk-next').addEventListener('click', () => walkStep(+1));
+  $('walk-prev').addEventListener('click', () => walkStep(-1));
+  $('walk-bpm-up').addEventListener('click', () => walkBpm(+5));
+  $('walk-bpm-down').addEventListener('click', () => walkBpm(-5));
+
   // Presets
   $('preset-save').addEventListener('click', saveCurrentAsPreset);
 
@@ -730,10 +769,261 @@ function setupVersionAndUpdate() {
   });
 }
 
+// --- Sessions / training walkthrough ---
+
+const SESSION_FILES = ['./sessions/drum-beginner-session.json'];
+let availableSessions = [];
+let walk = null;            // { session, exercises[], idx, exercise, timerEnd, timerInterval }
+
+async function loadSessions() {
+  const results = await Promise.all(SESSION_FILES.map(f =>
+    fetch(f).then(r => r.ok ? r.json() : null).catch(() => null)
+  ));
+  availableSessions = results.filter(Boolean);
+}
+
+function openSessionsList() {
+  const root = $('sessions-list');
+  root.innerHTML = '';
+  if (!availableSessions.length) {
+    root.innerHTML = '<p class="muted">Тренировки не найдены.</p>';
+  } else {
+    availableSessions.forEach(s => {
+      const card = document.createElement('button');
+      card.className = 'session-card';
+      const blocksHtml = s.blocks.map(b =>
+        `<span>${b.title} · ${b.subtitle}</span>`
+      ).join('');
+      card.innerHTML = `
+        <div class="session-card-title">${s.title}</div>
+        <div class="session-card-sub">${s.subtitle}</div>
+        <div class="session-card-blocks">${blocksHtml}</div>
+      `;
+      card.addEventListener('click', () => startWalkthrough(s));
+      root.appendChild(card);
+    });
+  }
+  showFullscreen('sessions-screen');
+}
+
+function closeSessionsList() {
+  hideFullscreen('sessions-screen');
+}
+
+function showFullscreen(id) {
+  const el = $(id);
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+}
+
+function hideFullscreen(id) {
+  const el = $(id);
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+}
+
+function flattenSession(s) {
+  return s.blocks.flatMap((b, bi) =>
+    b.exercises.map((ex, ei) => ({
+      ...ex,
+      blockIdx: bi,
+      blockTitle: b.title,
+      blockSubtitle: b.subtitle,
+      indexInBlock: ei,
+      totalInBlock: b.exercises.length,
+    }))
+  );
+}
+
+function startWalkthrough(session) {
+  closeSessionsList();
+  walk = {
+    session,
+    exercises: flattenSession(session),
+    idx: 0,
+    exercise: null,
+    timerEnd: 0,
+    timerInterval: null,
+  };
+  showFullscreen('walk-screen');
+  renderExercise();
+}
+
+function closeWalkthrough() {
+  if (walk?.timerInterval) clearInterval(walk.timerInterval);
+  walk = null;
+  if (state.isPlaying) stop();
+  hideFullscreen('walk-screen');
+}
+
+function walkStep(delta) {
+  if (!walk) return;
+  const next = walk.idx + delta;
+  if (next < 0) return;
+  if (next >= walk.exercises.length) {
+    showToast('Сессия завершена. Молодец!');
+    closeWalkthrough();
+    return;
+  }
+  walk.idx = next;
+  renderExercise();
+}
+
+function walkBpm(delta) {
+  if (!walk) return;
+  setBpm(state.bpm + delta);
+  $('walk-bpm').textContent = state.bpm;
+}
+
+function renderExercise() {
+  const ex = walk.exercises[walk.idx];
+  walk.exercise = ex;
+
+  $('walk-block-name').textContent = ex.blockTitle;
+  $('walk-step-info').textContent =
+    `${ex.indexInBlock + 1} / ${ex.totalInBlock} · упр. ${walk.idx + 1} из ${walk.exercises.length}`;
+
+  $('walk-title').textContent = ex.title;
+  $('walk-instructions').textContent = ex.instructions || '';
+  $('walk-tip').textContent = ex.tip || '';
+
+  // Sticking
+  const stickEl = $('walk-sticking');
+  stickEl.textContent = ex.sticking || '';
+
+  // Apply metronome state if it's a metronome exercise (not free-play)
+  if (!ex.freePlay) {
+    if (typeof ex.bpm === 'number') setBpm(ex.bpm);
+    if (Array.isArray(ex.timeSig)) {
+      state.beatsPerMeasure = ex.timeSig[0];
+      state.beatUnit = ex.timeSig[1];
+      state.currentBeat = 0;
+      rebuildBeatIndicator();
+      updateTimeDisplay();
+    }
+    if (typeof ex.subdivision === 'number') {
+      state.subdivision = ex.subdivision;
+      state.currentSub = 0;
+      updateSubDisplay();
+    }
+    if (Array.isArray(ex.beats)) {
+      state.beatTypes = ex.beats.slice(0, state.beatsPerMeasure);
+      while (state.beatTypes.length < state.beatsPerMeasure) state.beatTypes.push('beat');
+      rebuildBeatIndicator();
+    }
+    // Auto-start metronome if not already playing
+    if (!state.isPlaying) start();
+    $('walk-bpm').textContent = state.bpm;
+    $('walk-timesig').textContent = `${state.beatsPerMeasure} / ${state.beatUnit}`;
+    $('walk-sub').textContent = SUB_META[state.subdivision]?.symbol || '♩';
+  } else {
+    // Free play — stop metronome
+    if (state.isPlaying) stop();
+    $('walk-bpm').textContent = '—';
+    $('walk-timesig').textContent = '—';
+    $('walk-sub').textContent = '—';
+  }
+
+  // Groove notation
+  renderGroove(ex.groove || null);
+
+  // Timer
+  startWalkTimer(ex.durationSec || 0);
+}
+
+function renderGroove(groove) {
+  const root = $('walk-groove');
+  root.innerHTML = '';
+  if (!groove) return;
+
+  const cols = groove.labels.length;
+  // gridColumn: label column + N data columns
+  const grid = document.createElement('div');
+  grid.className = 'groove-grid';
+
+  // Header row: empty + numeric labels
+  const headerRow = document.createElement('div');
+  headerRow.className = 'groove-row';
+  headerRow.style.gridTemplateColumns = `60px repeat(${cols}, 1fr)`;
+  const empty = document.createElement('div');
+  empty.className = 'groove-cell label';
+  headerRow.appendChild(empty);
+  groove.labels.forEach(lbl => {
+    const c = document.createElement('div');
+    c.className = 'groove-cell head' + (/^\d/.test(lbl) ? ' head-num' : '');
+    c.textContent = lbl;
+    headerRow.appendChild(c);
+  });
+  grid.appendChild(headerRow);
+
+  // Data rows
+  groove.rows.forEach(row => {
+    const r = document.createElement('div');
+    r.className = 'groove-row';
+    r.style.gridTemplateColumns = `60px repeat(${cols}, 1fr)`;
+    const lbl = document.createElement('div');
+    lbl.className = 'groove-cell label';
+    lbl.textContent = row.name;
+    r.appendChild(lbl);
+    row.hits.forEach(h => {
+      const c = document.createElement('div');
+      c.className = 'groove-cell';
+      if (h === 'x') c.innerHTML = '<span class="groove-mark x">×</span>';
+      else if (h === 'o') c.innerHTML = '<span class="groove-mark o"></span>';
+      r.appendChild(c);
+    });
+    grid.appendChild(r);
+  });
+
+  root.appendChild(grid);
+}
+
+function startWalkTimer(durationSec) {
+  if (walk.timerInterval) {
+    clearInterval(walk.timerInterval);
+    walk.timerInterval = null;
+  }
+  if (!durationSec) {
+    $('walk-timer-text').textContent = '—';
+    $('walk-timer-fill').style.width = '0%';
+    return;
+  }
+  walk.timerEnd = Date.now() + durationSec * 1000;
+  const total = durationSec;
+  const tick = () => {
+    const remaining = Math.max(0, Math.ceil((walk.timerEnd - Date.now()) / 1000));
+    const elapsed = total - remaining;
+    const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    $('walk-timer-text').textContent = `${m}:${String(s).padStart(2, '0')}`;
+    $('walk-timer-fill').style.width = pct + '%';
+    if (remaining <= 0) {
+      clearInterval(walk.timerInterval);
+      walk.timerInterval = null;
+      showToast('Время вышло. Можно идти дальше.');
+    }
+  };
+  tick();
+  walk.timerInterval = setInterval(tick, 250);
+}
+
 // --- Init ---
 
 function init() {
+  // Restore persisted BT latency before bind() reads it
+  const storedBt = parseInt(localStorage.getItem(BT_LATENCY_KEY) || '0', 10);
+  if (Number.isFinite(storedBt)) state.btLatencyMs = storedBt;
+
   bind();
+
+  // Apply BT latency to the slider after binding
+  const btLag = $('bt-lag');
+  if (btLag) {
+    btLag.value = state.btLatencyMs;
+    $('bt-lag-out').value = state.btLatencyMs;
+  }
+
   buildTimeGrid();
   rebuildBeatIndicator();
   renderBuiltinPresets();
@@ -742,6 +1032,7 @@ function init() {
   updateTimeDisplay();
   updatePlayButton();
   setupVersionAndUpdate();
+  loadSessions();
   // Wheel must build after layout settles so clientWidth is correct
   requestAnimationFrame(buildBpmWheel);
 }
