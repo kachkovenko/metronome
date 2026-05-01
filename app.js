@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 const state = {
   bpm: 100,
@@ -32,9 +32,13 @@ const state = {
   // Bluetooth output latency (ms). Visual indicator is delayed by this much
   // so the flash matches when the click actually arrives in the listener's ear.
   btLatencyMs: 0,
+  // When true, pull the value from audioCtx.outputLatency on each start();
+  // when false, the manual slider is canonical.
+  autoBtLatency: true,
 };
 
 const BT_LATENCY_KEY = 'metronome.bt-latency-ms';
+const BT_AUTO_KEY = 'metronome.bt-auto';
 
 let audioCtx = null;
 let silentAudio = null;
@@ -161,6 +165,7 @@ async function start() {
     showToast('Не удалось включить звук. Проверь громкость и переключатель silent.');
     return;
   }
+  detectBtLatency();
   if (state.trainerEnabled) setBpm(state.trainerStart);
   state.isPlaying = true;
   state.currentBeat = 0;
@@ -649,22 +654,33 @@ function bind() {
     $('mute-pct-out').value = state.mutePct;
   });
 
-  // Bluetooth latency
+  // Bluetooth latency — manual controls
   const btLag = $('bt-lag');
   const btLagOut = $('bt-lag-out');
   btLag.addEventListener('input', () => {
+    if (state.autoBtLatency) return;  // ignore while auto is on
     state.btLatencyMs = Number(btLag.value);
     btLagOut.value = state.btLatencyMs;
     localStorage.setItem(BT_LATENCY_KEY, String(state.btLatencyMs));
   });
   document.querySelectorAll('[data-bt-preset]').forEach(b => {
     b.addEventListener('click', () => {
+      if (state.autoBtLatency) return;
       const v = Number(b.dataset.btPreset);
       state.btLatencyMs = v;
       btLag.value = v;
       btLagOut.value = v;
       localStorage.setItem(BT_LATENCY_KEY, String(v));
     });
+  });
+
+  // Bluetooth latency — auto toggle
+  $('bt-auto').addEventListener('change', e => {
+    state.autoBtLatency = e.target.checked;
+    localStorage.setItem(BT_AUTO_KEY, state.autoBtLatency ? '1' : '0');
+    updateBtLatencyUI();
+    // If we're playing, immediately re-detect; otherwise fires on next start
+    if (state.autoBtLatency && state.isPlaying) detectBtLatency();
   });
 
   // Sessions
@@ -767,6 +783,36 @@ function setupVersionAndUpdate() {
       updateBtn.disabled = false;
     });
   });
+}
+
+// --- Bluetooth latency detection ---
+
+function detectBtLatency() {
+  if (!state.autoBtLatency) return;
+  if (!audioCtx || typeof audioCtx.outputLatency !== 'number') return;
+  const detectedMs = Math.round(audioCtx.outputLatency * 1000);
+  // Some browsers/devices return 0 in the first tick — leave previous value.
+  if (detectedMs <= 0) return;
+  state.btLatencyMs = detectedMs;
+  updateBtLatencyUI();
+}
+
+function updateBtLatencyUI() {
+  const lag = $('bt-lag');
+  const lagOut = $('bt-lag-out');
+  const detected = $('bt-detected');
+  if (lag) lag.value = state.btLatencyMs;
+  if (lagOut) lagOut.value = state.btLatencyMs;
+  if (detected) {
+    detected.textContent = state.autoBtLatency
+      ? (state.btLatencyMs > 0 ? state.btLatencyMs + ' мс' : '— (нажми СТАРТ)')
+      : '—';
+  }
+  // Lock the slider/presets when auto mode is on
+  const lagRow = $('bt-lag-row');
+  const presets = $('bt-presets');
+  if (lagRow) lagRow.classList.toggle('disabled-control', state.autoBtLatency);
+  if (presets) presets.classList.toggle('disabled-control', state.autoBtLatency);
 }
 
 // --- Sessions / training walkthrough ---
@@ -1011,18 +1057,17 @@ function startWalkTimer(durationSec) {
 // --- Init ---
 
 function init() {
-  // Restore persisted BT latency before bind() reads it
+  // Restore persisted BT latency settings before bind() reads them
   const storedBt = parseInt(localStorage.getItem(BT_LATENCY_KEY) || '0', 10);
   if (Number.isFinite(storedBt)) state.btLatencyMs = storedBt;
+  const storedAuto = localStorage.getItem(BT_AUTO_KEY);
+  if (storedAuto !== null) state.autoBtLatency = storedAuto === '1';
 
   bind();
 
-  // Apply BT latency to the slider after binding
-  const btLag = $('bt-lag');
-  if (btLag) {
-    btLag.value = state.btLatencyMs;
-    $('bt-lag-out').value = state.btLatencyMs;
-  }
+  // Apply BT latency UI state after binding
+  $('bt-auto').checked = state.autoBtLatency;
+  updateBtLatencyUI();
 
   buildTimeGrid();
   rebuildBeatIndicator();

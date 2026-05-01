@@ -102,12 +102,19 @@
 
       <details>
         <summary>Задержка наушников</summary>
-        <p class="muted small">Если играешь в Bluetooth-наушниках, звук приходит с задержкой. Слайдер двигает визуальный индикатор позже, чтобы вспышка совпала с кликом, который ты слышишь. Подбирай на слух при включённом метрономе.</p>
-        <div class="vol">
+        <p class="muted small">Если играешь в Bluetooth-наушниках, звук приходит с задержкой. Визуальный индикатор сдвигается позже, чтобы вспышка совпала с кликом в наушниках.</p>
+
+        <label class="toggle">
+          <input id="bt-auto" type="checkbox" checked>
+          <span>Автоопределение</span>
+        </label>
+        <p class="muted small bt-detected-line">При старте читаем <code>audioCtx.outputLatency</code>. Определено: <output id="bt-detected">—</output></p>
+
+        <div class="vol" id="bt-lag-row">
           <label>Задержка <output id="bt-lag-out">0</output> мс</label>
           <input id="bt-lag" type="range" min="0" max="400" step="5" value="0">
         </div>
-        <div class="presets">
+        <div class="presets" id="bt-presets">
           <button class="preset" data-bt-preset="0">Проводные</button>
           <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
           <button class="preset" data-bt-preset="200">AirPods</button>

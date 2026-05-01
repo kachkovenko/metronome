@@ -550,6 +550,19 @@ details > *:last-child { padding-bottom: 16px; }
 
 .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
 
+.bt-detected-line code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  background: var(--card-3);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.disabled-control {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .grid2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
