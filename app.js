@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.5';
 
 const state = {
   bpm: 100,
@@ -244,7 +244,7 @@ function cycleBeat(i) {
 
 const BPM_MIN = 30;
 const BPM_MAX = 300;
-const TICK_PX = 8;
+const TICK_PX = 10;  // tick (2px) + gap (8px) per BPM step
 let suppressWheelScroll = false;
 
 function buildBpmWheel() {
@@ -252,14 +252,10 @@ function buildBpmWheel() {
   track.innerHTML = '';
   for (let bpm = BPM_MIN; bpm <= BPM_MAX; bpm++) {
     const tick = document.createElement('div');
-    let cls = 'wheel-tick';
-    if (bpm % 10 === 0) cls += ' major';
-    else if (bpm % 5 === 0) cls += ' mid';
-    tick.className = cls;
+    tick.className = 'wheel-tick';
     tick.dataset.bpm = bpm;
     track.appendChild(tick);
   }
-  // padding equal to half wheel width on each side, set inline so first/last reach center
   applyWheelPadding();
   scrollWheelToBpm(state.bpm, false);
 }

@@ -140,55 +140,51 @@ button, input, select, textarea {
 
 .wheel-track {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   height: 100%;
-  /* padding handled inline by JS so first/last ticks can reach center */
+  gap: 8px;
+  /* padding-left/right set inline by JS so first/last tick can reach center */
 }
 
 .wheel-tick {
-  flex: 0 0 8px;
-  height: 6px;
-  background: var(--card-3);
-  scroll-snap-align: center;
+  flex: 0 0 2px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.22);
   border-radius: 1px;
-  margin-right: 0;
-  transform-origin: bottom;
+  scroll-snap-align: center;
 }
 
-.wheel-tick.mid { height: 12px; background: var(--muted); }
-.wheel-tick.major { height: 22px; background: var(--fg); }
-
-/* Fade ticks toward edges */
+/* Edge fades — wheel ticks emerge from / disappear into the card background */
 .bpm-wheel::before,
 .bpm-wheel::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 40px;
+  width: 72px;
   pointer-events: none;
   z-index: 2;
 }
 .bpm-wheel::before {
   left: 0;
-  background: linear-gradient(to right, var(--card), transparent);
+  background: linear-gradient(to right, var(--card) 0%, var(--card) 25%, transparent 100%);
 }
 .bpm-wheel::after {
   right: 0;
-  background: linear-gradient(to left, var(--card), transparent);
+  background: linear-gradient(to left, var(--card) 0%, var(--card) 25%, transparent 100%);
 }
 
 .wheel-center {
   position: absolute;
   left: 50%;
-  top: 0;
-  bottom: 0;
+  top: 4px;
+  bottom: 4px;
   width: 2px;
   background: var(--accent);
   border-radius: 1px;
   transform: translateX(-50%);
   pointer-events: none;
-  box-shadow: 0 0 12px rgba(213, 255, 60, 0.6);
+  box-shadow: 0 0 12px rgba(213, 255, 60, 0.7);
   z-index: 3;
 }
 
