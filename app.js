@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 
 const state = {
   bpm: 100,
@@ -29,6 +29,7 @@ const state = {
 };
 
 let audioCtx = null;
+let silentAudio = null;
 const SCHEDULE_AHEAD = 0.1;
 const LOOKAHEAD_MS = 25;
 let nextNoteTime = 0;
@@ -59,12 +60,27 @@ const BUILTIN_PRESETS = [
 
 // --- Audio scheduling ---
 
-function ensureAudio() {
+async function ensureAudio() {
   if (!audioCtx) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     audioCtx = new Ctx();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch {}
+  }
+
+  // iOS silent-switch bypass: a silent <audio> loop puts the audio session
+  // into "playback" category, which ignores the physical mute switch.
+  // Harmless on Android — just plays inaudible audio in the background.
+  if (!silentAudio) {
+    silentAudio = new Audio('./silent.mp3');
+    silentAudio.loop = true;
+    silentAudio.preload = 'auto';
+    silentAudio.setAttribute('playsinline', '');
+  }
+  if (silentAudio.paused) {
+    try { await silentAudio.play(); } catch {}
+  }
 }
 
 function playClick(type, time) {
@@ -130,8 +146,12 @@ function scheduler() {
   timerID = setTimeout(scheduler, LOOKAHEAD_MS);
 }
 
-function start() {
-  ensureAudio();
+async function start() {
+  await ensureAudio();
+  if (audioCtx.state !== 'running') {
+    showToast('Не удалось включить звук. Проверь громкость и переключатель silent.');
+    return;
+  }
   if (state.trainerEnabled) setBpm(state.trainerStart);
   state.isPlaying = true;
   state.currentBeat = 0;
