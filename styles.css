@@ -333,6 +333,11 @@ button, input, select, textarea {
   margin: 12px 0 0;
 }
 
+/* Hide keyboard shortcut hint on touch-only devices */
+@media (hover: none) and (pointer: coarse) {
+  .hint { display: none; }
+}
+
 /* Drawer */
 .drawer {
   position: fixed;
