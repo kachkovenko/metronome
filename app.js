@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 
 const state = {
   bpm: 100,
@@ -524,32 +524,43 @@ function bind() {
   const wheel = $('bpm-wheel');
   wheel.addEventListener('scroll', onWheelScroll, { passive: true });
 
-  // Mouse wheel: translate vertical deltaY into horizontal scroll
+  // Mouse wheel / trackpad: translate any wheel delta into horizontal scroll
   wheel.addEventListener('wheel', (e) => {
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-      e.preventDefault();
-      wheel.scrollLeft += e.deltaY;
-    }
+    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (delta === 0) return;
+    e.preventDefault();
+    wheel.scrollLeft += delta;
   }, { passive: false });
 
-  // Click-and-drag on desktop (mouse). Touch already handled natively.
+  // Click-and-drag on desktop. Touch is handled natively.
   let dragStartX = 0;
   let dragStartScroll = 0;
+  let dragMoved = false;
   let isDragging = false;
   wheel.addEventListener('mousedown', (e) => {
+    e.preventDefault();
     isDragging = true;
+    dragMoved = false;
     dragStartX = e.clientX;
     dragStartScroll = wheel.scrollLeft;
     wheel.classList.add('dragging');
   });
   window.addEventListener('mousemove', (e) => {
     if (!isDragging) return;
-    wheel.scrollLeft = dragStartScroll - (e.clientX - dragStartX);
+    const dx = e.clientX - dragStartX;
+    if (Math.abs(dx) > 2) dragMoved = true;
+    wheel.scrollLeft = dragStartScroll - dx;
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (e) => {
     if (!isDragging) return;
     isDragging = false;
     wheel.classList.remove('dragging');
+    // Click without drag: jump wheel to clicked position
+    if (!dragMoved) {
+      const rect = wheel.getBoundingClientRect();
+      const offsetFromCenter = e.clientX - (rect.left + rect.width / 2);
+      wheel.scrollTo({ left: wheel.scrollLeft + offsetFromCenter, behavior: 'smooth' });
+    }
   });
 
   // Recompute padding on viewport resize
