@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 
 const state = {
   bpm: 100,
@@ -28,6 +28,11 @@ const state = {
 
   muteEnabled: false,
   mutePct: 20,
+
+  // Identifier of the currently-applied preset, or null. Format: "builtin:N" / "user:N".
+  // Cleared when the user touches the metronome and the new state diverges from the preset
+  // (checked on entering the Settings tab).
+  activePresetSig: null,
 
   // Bluetooth output latency (ms). Visual indicator is delayed by this much
   // so the flash matches when the click actually arrives in the listener's ear.
@@ -341,8 +346,6 @@ function updateSubDisplay() {
 function updateTimeDisplay() {
   $('time-num-out').textContent = state.beatsPerMeasure;
   $('time-den-out').textContent = state.beatUnit;
-  $('time-num').value = state.beatsPerMeasure;
-  $('time-den').value = state.beatUnit;
   document.querySelectorAll('#time-grid button').forEach(b => {
     const n = Number(b.dataset.num);
     const d = Number(b.dataset.den);
@@ -384,28 +387,57 @@ function tap() {
 
 const PRESETS_KEY = 'metronome.user-presets.v1';
 
-function applyPreset(p) {
+function applyPreset(p, sig = null) {
   setBpm(p.bpm);
   state.beatsPerMeasure = p.num;
   state.beatUnit = p.den;
   state.subdivision = p.sub;
   state.currentBeat = 0;
   state.currentSub = 0;
+  state.activePresetSig = sig;
   rebuildBeatIndicator();
   updateSubDisplay();
   updateTimeDisplay();
+  updateActivePresetUI();
+}
+
+function updateActivePresetUI() {
+  document.querySelectorAll('.preset[data-preset-sig]').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.presetSig === state.activePresetSig);
+  });
+}
+
+function checkActivePresetStillMatches() {
+  if (!state.activePresetSig) return;
+  const [type, idxStr] = state.activePresetSig.split(':');
+  const idx = Number(idxStr);
+  let p = null;
+  if (type === 'builtin') p = BUILTIN_PRESETS[idx];
+  else if (type === 'user') p = loadUserPresets()[idx];
+  const matches = p
+    && state.bpm === p.bpm
+    && state.beatsPerMeasure === p.num
+    && state.beatUnit === p.den
+    && state.subdivision === p.sub;
+  if (!matches) {
+    state.activePresetSig = null;
+    updateActivePresetUI();
+  }
 }
 
 function renderBuiltinPresets() {
   const root = $('builtin-presets');
   root.innerHTML = '';
-  BUILTIN_PRESETS.forEach(p => {
+  BUILTIN_PRESETS.forEach((p, idx) => {
+    const sig = `builtin:${idx}`;
     const b = document.createElement('button');
     b.className = 'preset';
+    b.dataset.presetSig = sig;
     b.textContent = p.name;
-    b.addEventListener('click', () => applyPreset(p));
+    b.addEventListener('click', () => applyPreset(p, sig));
     root.appendChild(b);
   });
+  updateActivePresetUI();
 }
 
 function loadUserPresets() {
@@ -426,12 +458,14 @@ function renderUserPresets() {
     return;
   }
   list.forEach((p, idx) => {
+    const sig = `user:${idx}`;
     const wrap = document.createElement('div');
     wrap.className = 'preset-row';
     const b = document.createElement('button');
     b.className = 'preset';
+    b.dataset.presetSig = sig;
     b.textContent = `${p.name} · ${p.bpm} BPM`;
-    b.addEventListener('click', () => applyPreset(p));
+    b.addEventListener('click', () => applyPreset(p, sig));
     const del = document.createElement('button');
     del.className = 'preset-del';
     del.textContent = '✕';
@@ -440,11 +474,14 @@ function renderUserPresets() {
       const list2 = loadUserPresets();
       list2.splice(idx, 1);
       saveUserPresets(list2);
+      // User-preset indices may shift after deletion — drop selection if it pointed here
+      if (state.activePresetSig?.startsWith('user:')) state.activePresetSig = null;
       renderUserPresets();
     });
     wrap.append(b, del);
     root.appendChild(wrap);
   });
+  updateActivePresetUI();
 }
 
 function saveCurrentAsPreset() {
@@ -480,6 +517,8 @@ function switchTab(tabId) {
     b.classList.toggle('active', b.dataset.tab === tabId);
   });
   $('page-title').textContent = TAB_TITLES[tabId];
+  // Re-evaluate active preset highlight when entering Settings
+  if (tabId === 'settings') checkActivePresetStillMatches();
 }
 
 function openModal(id) {
@@ -616,18 +655,6 @@ function bind() {
       const modal = el.closest('.modal');
       if (modal) closeModal(modal.id);
     });
-  });
-
-  // Drawer's detailed time selectors (legacy fallback inside drawer)
-  $('time-num').addEventListener('change', e => {
-    state.beatsPerMeasure = Number(e.target.value);
-    state.currentBeat = 0;
-    rebuildBeatIndicator();
-    updateTimeDisplay();
-  });
-  $('time-den').addEventListener('change', e => {
-    state.beatUnit = Number(e.target.value);
-    updateTimeDisplay();
   });
 
   // Volumes
