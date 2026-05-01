@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 
 const state = {
   bpm: 100,
@@ -42,6 +42,7 @@ const BT_AUTO_KEY = 'metronome.bt-auto';
 
 let audioCtx = null;
 let silentAudio = null;
+let wakeLockSentinel = null;
 const SCHEDULE_AHEAD = 0.1;
 const LOOKAHEAD_MS = 25;
 let nextNoteTime = 0;
@@ -175,6 +176,7 @@ async function start() {
   scheduler();
   requestAnimationFrame(draw);
   updatePlayButton();
+  requestWakeLock();
 }
 
 function stop() {
@@ -183,6 +185,7 @@ function stop() {
   notesInQueue.length = 0;
   clearBeatIndicator();
   updatePlayButton();
+  releaseWakeLock();
 }
 
 function toggle() {
@@ -711,6 +714,13 @@ function bind() {
   });
 
   document.addEventListener('gesturestart', e => e.preventDefault());
+
+  // Re-acquire screen wake lock when returning to the tab while playing.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.isPlaying) {
+      requestWakeLock();
+    }
+  });
 }
 
 // --- Service Worker & Version ---
@@ -783,6 +793,29 @@ function setupVersionAndUpdate() {
       updateBtn.disabled = false;
     });
   });
+}
+
+// --- Screen Wake Lock (keeps phone from sleeping while playing) ---
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  if (wakeLockSentinel) return;
+  try {
+    wakeLockSentinel = await navigator.wakeLock.request('screen');
+    wakeLockSentinel.addEventListener('release', () => {
+      // Browser may auto-release on tab hide; we re-request on visibilitychange.
+      wakeLockSentinel = null;
+    });
+  } catch {
+    // Wake Lock can fail if the page isn't visible or on unsupported browsers.
+    wakeLockSentinel = null;
+  }
+}
+
+function releaseWakeLock() {
+  if (!wakeLockSentinel) return;
+  wakeLockSentinel.release().catch(() => {});
+  wakeLockSentinel = null;
 }
 
 // --- Bluetooth latency detection ---
