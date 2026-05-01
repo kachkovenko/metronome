@@ -119,10 +119,18 @@ button, input, select, textarea {
   font-weight: 500;
 }
 
-/* BPM wheel — horizontal scrollable tick tape */
-.bpm-wheel {
+/* BPM wheel — wrap holds non-scrolling overlays (center line, edge fades);
+   inner .bpm-wheel is the actual scroll container. Center line and fade
+   must live OUTSIDE the scroll container, otherwise they scroll with the
+   ticks and disappear off-viewport. */
+.bpm-wheel-wrap {
   position: relative;
+  width: 100%;
   height: 72px;
+}
+
+.bpm-wheel {
+  height: 100%;
   width: 100%;
   overflow-x: scroll;
   overflow-y: hidden;
@@ -130,6 +138,10 @@ button, input, select, textarea {
   -ms-overflow-style: none;
   touch-action: pan-x;
   cursor: grab;
+  /* Edge fade via mask — clips visible viewport, not scroll content,
+     so the fade stays at the edges as ticks scroll past. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 96px, black calc(100% - 96px), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, black 96px, black calc(100% - 96px), transparent 100%);
 }
 
 .bpm-wheel::-webkit-scrollbar { display: none; }
@@ -149,26 +161,6 @@ button, input, select, textarea {
   height: 56px;
   background: rgba(255, 255, 255, 0.28);
   border-radius: 1px;
-}
-
-/* Edge fades — ticks dissolve into transparency on both sides */
-.bpm-wheel::before,
-.bpm-wheel::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 100px;
-  pointer-events: none;
-  z-index: 2;
-}
-.bpm-wheel::before {
-  left: 0;
-  background: linear-gradient(to right, var(--card), transparent);
-}
-.bpm-wheel::after {
-  right: 0;
-  background: linear-gradient(to left, var(--card), transparent);
 }
 
 .wheel-center {
