@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 
 const state = {
   bpm: 100,
@@ -707,8 +707,17 @@ function bind() {
 
   // Mic timing trainer
   $('mic-on').addEventListener('change', async e => {
-    if (e.target.checked) await startMic();
-    else stopMic();
+    if (e.target.checked) {
+      if (state.isPlaying) {
+        e.target.checked = false;
+        setMicStatus('Останови метроном перед включением — нужно прогнать тестовый клик и проверить, не идёт ли звук через динамик.');
+        showToast('Сначала останови метроном');
+        return;
+      }
+      await startMic();
+    } else {
+      stopMic();
+    }
   });
 
   // Bluetooth latency — manual controls
@@ -877,6 +886,7 @@ async function startMic() {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('Микрофон не поддерживается этим браузером');
     }
+    setMicStatus('Запрашиваю доступ к микрофону…');
     await ensureAudio();
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -893,6 +903,24 @@ async function startMic() {
     mic.source.connect(mic.analyser);
     mic.energyHistory.length = 0;
     mic.lastOnsetTime = 0;
+
+    // Verify the metronome is going to the headphones, not the speaker:
+    // play one test click and see whether the mic picks it up.
+    setMicStatus('Проверяю звук… играем один клик.');
+    const result = await runLoopbackTest();
+
+    if (!result.headphones) {
+      stopMic();
+      $('mic-on').checked = false;
+      setMicStatus(
+        'Похоже, звук идёт через динамик — микрофон поймал тестовый клик ' +
+        `(peak ${result.peakRms.toFixed(3)}, baseline ${result.baseline.toFixed(3)}). ` +
+        'Подключи наушники и попробуй ещё раз.'
+      );
+      showToast('Подключи наушники');
+      return;
+    }
+
     state.micEnabled = true;
     micTick();
     updateMicUI();
@@ -903,6 +931,60 @@ async function startMic() {
     setMicStatus('Не получилось включить микрофон: ' + (e.message || e.name || 'неизвестная ошибка'));
     showToast('Микрофон недоступен');
   }
+}
+
+// Plays a single test click and watches the mic for ~250 ms after.
+// If peak RMS in that window is above the absolute floor AND ≥3× the
+// pre-click baseline, the mic likely heard the click → no headphones.
+function runLoopbackTest() {
+  return new Promise(resolve => {
+    if (!mic.analyser || !audioCtx) {
+      resolve({ headphones: true, peakRms: 0, baseline: 0, reason: 'no-audio' });
+      return;
+    }
+
+    const baselineStart = audioCtx.currentTime;
+    const clickAt = baselineStart + 0.20;        // schedule click 200 ms ahead
+    const baselineEnd = clickAt - 0.03;          // sample baseline up to 30 ms before click
+    const peakStart = clickAt - 0.03;
+    const peakEnd = clickAt + 0.20;
+    const finishAt = peakEnd + 0.02;
+
+    playClick('beat', clickAt);
+
+    let peakRms = 0;
+    const baselineSamples = [];
+
+    function tick() {
+      if (!mic.analyser) {
+        resolve({ headphones: true, peakRms, baseline: 0, reason: 'mic-stopped' });
+        return;
+      }
+      const now = audioCtx.currentTime;
+
+      mic.analyser.getFloatTimeDomainData(mic.buf);
+      let sumSq = 0;
+      for (let i = 0; i < mic.buf.length; i++) sumSq += mic.buf[i] * mic.buf[i];
+      const rms = Math.sqrt(sumSq / mic.buf.length);
+
+      if (now >= baselineStart && now < baselineEnd) {
+        baselineSamples.push(rms);
+      } else if (now >= peakStart && now < peakEnd) {
+        if (rms > peakRms) peakRms = rms;
+      }
+
+      if (now >= finishAt) {
+        const baseline = baselineSamples.length
+          ? baselineSamples.reduce((a, b) => a + b, 0) / baselineSamples.length
+          : 0;
+        const heard = peakRms > 0.02 && peakRms > baseline * 3;
+        resolve({ headphones: !heard, peakRms, baseline });
+        return;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
 }
 
 function stopMic() {
