@@ -466,7 +466,7 @@ button, input, select, textarea {
 }
 
 /* Mic live offset display (Метроном tab) */
-.mic-live {
+.mic-live:not([hidden]) {
   display: flex;
   flex-direction: column;
   align-items: center;
