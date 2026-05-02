@@ -68,6 +68,12 @@
           <span class="play-icon">▶</span>
           <span class="play-text">СТАРТ</span>
         </button>
+
+        <div id="mic-live" class="mic-live" hidden>
+          <span class="mic-live-offset" id="mic-live-offset">—</span>
+          <span class="mic-live-quality" id="mic-live-quality"></span>
+        </div>
+
         <p class="hint">Пробел — старт/стоп · T — tap tempo</p>
       </section>
 
@@ -79,7 +85,17 @@
         </div>
 
         <div class="tab-section">
-          <h2 class="tab-section-title">Тренажёры темпа</h2>
+          <h2 class="tab-section-title">Тренажёры</h2>
+
+          <details>
+            <summary>Тренажёр ритма (бета)</summary>
+            <p class="muted small">Слушает микрофон и показывает на главном экране, насколько точно ты попадаешь в долю в реальном времени. <strong>Нужны наушники</strong> — иначе микрофон будет ловить сам метроном.</p>
+            <label class="toggle">
+              <input id="mic-on" type="checkbox">
+              <span>Включить</span>
+            </label>
+            <p class="muted small" id="mic-status">—</p>
+          </details>
 
           <details>
             <summary>Speed Trainer</summary>

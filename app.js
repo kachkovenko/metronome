@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 
 const state = {
   bpm: 100,
@@ -40,10 +40,16 @@ const state = {
   // When true, pull the value from audioCtx.outputLatency on each start();
   // when false, the manual slider is canonical.
   autoBtLatency: true,
+
+  // Microphone-based timing trainer (Stage 1 MVP)
+  micEnabled: false,
+  // System input latency compensation in ms (Stage 2 will add calibration UI)
+  inputLatencyMs: 0,
 };
 
 const BT_LATENCY_KEY = 'metronome.bt-latency-ms';
 const BT_AUTO_KEY = 'metronome.bt-auto';
+const INPUT_LATENCY_KEY = 'metronome.input-latency-ms';
 
 let audioCtx = null;
 let silentAudio = null;
@@ -188,6 +194,7 @@ function stop() {
   state.isPlaying = false;
   clearTimeout(timerID);
   notesInQueue.length = 0;
+  recentBeats.length = 0;
   clearBeatIndicator();
   updatePlayButton();
   releaseWakeLock();
@@ -199,6 +206,11 @@ function toggle() {
 
 // --- Visual sync ---
 
+// Buffer of beats that have already played, used by mic onset matching to find
+// the nearest beat for late hits (notesInQueue only contains upcoming beats).
+const recentBeats = [];
+const RECENT_BEATS_WINDOW_SEC = 1.0;
+
 function draw() {
   if (!state.isPlaying) return;
   const now = audioCtx.currentTime;
@@ -207,7 +219,14 @@ function draw() {
   const visualOffset = state.btLatencyMs / 1000;
   while (notesInQueue.length && notesInQueue[0].time + visualOffset <= now) {
     const n = notesInQueue.shift();
-    if (n.sub === 0) highlightBeat(n.beat);
+    if (n.sub === 0) {
+      highlightBeat(n.beat);
+      recentBeats.push(n);
+    }
+  }
+  // Trim recent beats older than the matching window
+  while (recentBeats.length && recentBeats[0].time < now - RECENT_BEATS_WINDOW_SEC) {
+    recentBeats.shift();
   }
   requestAnimationFrame(draw);
 }
@@ -686,6 +705,12 @@ function bind() {
     $('mute-pct-out').value = state.mutePct;
   });
 
+  // Mic timing trainer
+  $('mic-on').addEventListener('change', async e => {
+    if (e.target.checked) await startMic();
+    else stopMic();
+  });
+
   // Bluetooth latency — manual controls
   const btLag = $('bt-lag');
   const btLagOut = $('bt-lag-out');
@@ -816,6 +841,171 @@ function setupVersionAndUpdate() {
       updateBtn.disabled = false;
     });
   });
+}
+
+// --- Microphone timing trainer (Stage 1 MVP) ---
+//
+// Listens to the mic, runs an energy-based onset detector with adaptive
+// threshold and refractory period, matches each detected onset to the
+// nearest scheduled beat, displays the offset in ms with a quality
+// label. Headphones required to keep the metronome out of the mic.
+
+const ONSET_REFRACTORY_SEC = 0.06;     // ignore re-triggers within 60 ms
+const ONSET_THRESHOLD_MULT = 2.2;      // peak must exceed N× rolling avg
+const ONSET_ABS_FLOOR = 0.012;         // minimum absolute RMS to consider
+const ENERGY_HISTORY_LEN = 30;         // sliding window for adaptive baseline
+const MATCH_WINDOW_MS = 250;           // farther than this = ignored
+const QUALITY_BANDS = [
+  { abs:  10, label: 'идеально', key: 'perfect' },
+  { abs:  25, label: 'хорошо',   key: 'good' },
+  { abs:  50, label: 'ок',       key: 'ok' },
+  { abs: Infinity, label: 'мимо', key: 'miss' },
+];
+
+const mic = {
+  stream: null,
+  source: null,
+  analyser: null,
+  buf: null,
+  energyHistory: [],
+  lastOnsetTime: 0,
+  rafId: 0,
+};
+
+async function startMic() {
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Микрофон не поддерживается этим браузером');
+    }
+    await ensureAudio();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    });
+    mic.stream = stream;
+    mic.source = audioCtx.createMediaStreamSource(stream);
+    mic.analyser = audioCtx.createAnalyser();
+    mic.analyser.fftSize = 1024;
+    mic.buf = new Float32Array(mic.analyser.fftSize);
+    mic.source.connect(mic.analyser);
+    mic.energyHistory.length = 0;
+    mic.lastOnsetTime = 0;
+    state.micEnabled = true;
+    micTick();
+    updateMicUI();
+    setMicStatus('Слушаю микрофон. Включи метроном и сыграй удар.');
+  } catch (e) {
+    state.micEnabled = false;
+    $('mic-on').checked = false;
+    setMicStatus('Не получилось включить микрофон: ' + (e.message || e.name || 'неизвестная ошибка'));
+    showToast('Микрофон недоступен');
+  }
+}
+
+function stopMic() {
+  state.micEnabled = false;
+  if (mic.rafId) cancelAnimationFrame(mic.rafId);
+  mic.rafId = 0;
+  if (mic.source) try { mic.source.disconnect(); } catch {}
+  if (mic.stream) mic.stream.getTracks().forEach(t => t.stop());
+  mic.stream = null;
+  mic.source = null;
+  mic.analyser = null;
+  mic.buf = null;
+  mic.energyHistory.length = 0;
+  updateMicUI();
+  setMicStatus('Выключен.');
+}
+
+function micTick() {
+  if (!state.micEnabled || !mic.analyser) return;
+  mic.analyser.getFloatTimeDomainData(mic.buf);
+
+  // RMS over the buffer
+  let sumSq = 0;
+  for (let i = 0; i < mic.buf.length; i++) sumSq += mic.buf[i] * mic.buf[i];
+  const rms = Math.sqrt(sumSq / mic.buf.length);
+
+  // Adaptive baseline: rolling average of recent RMS values
+  mic.energyHistory.push(rms);
+  if (mic.energyHistory.length > ENERGY_HISTORY_LEN) mic.energyHistory.shift();
+  const avg = mic.energyHistory.reduce((a, b) => a + b, 0) / mic.energyHistory.length;
+
+  const now = audioCtx.currentTime;
+  if (rms > ONSET_ABS_FLOOR
+      && rms > avg * ONSET_THRESHOLD_MULT
+      && now - mic.lastOnsetTime > ONSET_REFRACTORY_SEC) {
+    onMicOnset(now);
+    mic.lastOnsetTime = now;
+  }
+
+  mic.rafId = requestAnimationFrame(micTick);
+}
+
+function onMicOnset(time) {
+  if (!state.isPlaying) return;
+  // Compensate for system input latency: the mic sample arrived at `time`,
+  // but the actual hit happened a few ms earlier.
+  const adjusted = time - state.inputLatencyMs / 1000;
+
+  // Find nearest scheduled beat (sub === 0) across both upcoming and recent
+  let nearest = null;
+  let bestAbs = Infinity;
+  const candidates = notesInQueue.concat(recentBeats);
+  for (const n of candidates) {
+    if (n.sub !== 0) continue;
+    const delta = adjusted - n.time;
+    if (Math.abs(delta) < bestAbs) {
+      bestAbs = Math.abs(delta);
+      nearest = { delta, beat: n };
+    }
+  }
+
+  if (!nearest) return;
+  const offsetMs = Math.round(nearest.delta * 1000);
+  if (Math.abs(offsetMs) > MATCH_WINDOW_MS) return;
+  showOffset(offsetMs);
+}
+
+function showOffset(offsetMs) {
+  const liveEl = $('mic-live');
+  const offEl = $('mic-live-offset');
+  const qualEl = $('mic-live-quality');
+  if (!liveEl) return;
+
+  const abs = Math.abs(offsetMs);
+  const band = QUALITY_BANDS.find(b => abs <= b.abs);
+
+  const sign = offsetMs > 0 ? '+' : (offsetMs < 0 ? '−' : '');
+  // Use minus sign only via prefix; show absolute value
+  offEl.textContent = abs < 5 ? 'точно' : `${sign}${abs} мс`;
+  qualEl.textContent = band.label;
+  liveEl.dataset.quality = band.key;
+}
+
+function updateMicUI() {
+  const liveEl = $('mic-live');
+  if (!liveEl) return;
+  if (state.micEnabled) {
+    liveEl.hidden = false;
+    if (!liveEl.dataset.quality) {
+      $('mic-live-offset').textContent = '—';
+      $('mic-live-quality').textContent = 'жду удара';
+    }
+  } else {
+    liveEl.hidden = true;
+    delete liveEl.dataset.quality;
+    $('mic-live-offset').textContent = '—';
+    $('mic-live-quality').textContent = '';
+  }
+}
+
+function setMicStatus(text) {
+  const el = $('mic-status');
+  if (el) el.textContent = text;
 }
 
 // --- Screen Wake Lock (keeps phone from sleeping while playing) ---

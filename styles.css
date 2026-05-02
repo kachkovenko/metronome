@@ -465,6 +465,35 @@ button, input, select, textarea {
   margin: 12px 0 0;
 }
 
+/* Mic live offset display (Метроном tab) */
+.mic-live {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 0 0;
+}
+
+.mic-live-offset {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  transition: color 0.1s ease;
+}
+
+.mic-live-quality {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mic-live[data-quality="perfect"] .mic-live-offset { color: #4ade80; }
+.mic-live[data-quality="good"]    .mic-live-offset { color: var(--accent); }
+.mic-live[data-quality="ok"]      .mic-live-offset { color: #f59e0b; }
+.mic-live[data-quality="miss"]    .mic-live-offset { color: #ef4444; }
+
 /* Hide keyboard shortcut hint on touch-only devices */
 @media (hover: none) and (pointer: coarse) {
   .hint { display: none; }
