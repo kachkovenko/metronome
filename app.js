@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.9.0';
 
 const state = {
   bpm: 100,
@@ -220,6 +220,12 @@ async function start() {
   requestAnimationFrame(draw);
   updatePlayButton();
   requestWakeLock();
+  // If count-in is armed, show the big-number countdown overlay (the
+  // metronome ticks throughout, so when the overlay disappears the
+  // user feels a smooth transition from count-in to real start).
+  if (state.countinSec > 0 && !state.countinActive) {
+    runCountdownOverlay(state.countinSec);
+  }
 }
 
 function stop() {
@@ -424,8 +430,10 @@ function updatePlayButton() {
   btn.classList.toggle('playing', state.isPlaying);
   btn.querySelector('.play-icon').textContent = state.isPlaying ? '■' : '▶';
   btn.querySelector('.play-text').textContent = state.isPlaying ? 'СТОП' : 'СТАРТ';
+  // Allow re-arming the count-in even while the metronome plays — it
+  // just affects the next start. Lock only while a countdown is running.
   const cin = $('countin-btn');
-  if (cin) cin.disabled = state.isPlaying || state.countinActive;
+  if (cin) cin.disabled = state.countinActive;
   // Sync the in-fullscreen Start/Stop button (icon-only)
   const flashPlay = $('flash-play');
   if (flashPlay) {
@@ -752,16 +760,17 @@ function bind() {
     setFlashMode(true);
   });
 
-  // Count-in (delayed start)
+  // Count-in (delayed start) — picking arms; the countdown itself fires
+  // from start() when the user presses the main Start button.
   $('countin-btn').addEventListener('click', () => {
-    if (state.isPlaying || state.countinActive) return;
+    if (state.countinActive) return;  // can't change mid-countdown
     openModal('countin-modal');
   });
-  document.querySelectorAll('.countin-option').forEach(b => {
+  document.querySelectorAll('.countin-option, .countin-clear').forEach(b => {
     b.addEventListener('click', () => {
-      const sec = Number(b.dataset.sec);
+      const sec = Number(b.dataset.sec) || 0;
+      setCountinSec(sec);
       closeModal('countin-modal');
-      startCountin(sec);
     });
   });
 
@@ -1543,38 +1552,46 @@ function triggerFlash(beat) {
 
 // --- Count-in (delayed start) ---
 
-const COUNTIN_OPTIONS = [3, 5, 7, 10];
+// Picking a duration only ARMS the count-in; the countdown itself runs
+// when the user presses Start. countinSec is the chosen delay (0 = off);
+// countinActive flips true only while the countdown overlay is showing.
 
-async function startCountin(sec) {
-  if (state.isPlaying || state.countinActive) return;
+function setCountinSec(sec) {
+  state.countinSec = sec > 0 ? sec : 0;
+  updateCountinUI();
+}
+
+function updateCountinUI() {
+  const btn = $('countin-btn');
+  if (!btn) return;
+  const armed = state.countinSec > 0;
+  btn.classList.toggle('armed', armed);
+  const numEl = $('countin-btn-num');
+  if (numEl) numEl.textContent = armed ? state.countinSec : '';
+  // Also reflect the current selection back into the modal so user sees
+  // which option is active when they re-open it.
+  document.querySelectorAll('.countin-option').forEach(b => {
+    b.classList.toggle('is-active', Number(b.dataset.sec) === state.countinSec);
+  });
+  const clear = document.querySelector('.countin-clear');
+  if (clear) clear.classList.toggle('is-active', state.countinSec === 0);
+}
+
+// Called from start() when state.countinSec > 0. The metronome itself is
+// already running by the time we get here — we just show a big-number
+// overlay that counts down from N to 0, then clears.
+function runCountdownOverlay(sec) {
   state.countinActive = true;
-  state.countinSec = sec;
-
   const overlay = $('countin-overlay');
   const num = $('countin-num');
   let remaining = sec;
   num.textContent = remaining;
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
-  $('countin-btn')?.classList.add('armed');
-
-  // Kick off the metronome — clicks will be audible throughout the countdown,
-  // and after the overlay disappears the same scheduler keeps running, so
-  // there's no perceptible "switch" between count-in and the real start.
-  try { await start(); } catch {}
-  // Bail out if start() failed (no audio) or the user already pressed Stop
-  if (!state.isPlaying || !state.countinActive) {
-    finishCountin();
-    return;
-  }
-
   state.countinTimer = setInterval(() => {
     remaining--;
-    if (remaining <= 0) {
-      finishCountin();
-    } else {
-      num.textContent = remaining;
-    }
+    if (remaining <= 0) finishCountin();
+    else num.textContent = remaining;
   }, 1000);
 }
 
@@ -1589,13 +1606,9 @@ function finishCountin() {
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
   }
-  $('countin-btn')?.classList.remove('armed');
 }
 
-function cancelCountin() {
-  // Called from stop() when user aborts during countdown
-  finishCountin();
-}
+function cancelCountin() { finishCountin(); }
 
 // --- Init ---
 
@@ -1623,6 +1636,7 @@ function init() {
   updateSubDisplay();
   updateTimeDisplay();
   updatePlayButton();
+  updateCountinUI();
   setupVersionAndUpdate();
   loadSessions();
   // Wheel must build after layout settles so clientWidth is correct

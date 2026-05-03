@@ -456,42 +456,77 @@ button, input, select, textarea {
   box-shadow: 0 0 10px rgba(213, 255, 60, 0.7);
 }
 
-/* Play row — count-in button (round) + main start button (pill).
-   Both buttons share the same explicit height via --play-h so the round
-   button's diameter matches the pill's height pixel-for-pixel. (Relying on
-   align-items: stretch + aspect-ratio: 1 left a few-px gap in flex layout
-   because the SVG's intrinsic width fed back into the basis calculation.) */
+/* Play row — count-in pill sits BEHIND the main Start pill (same shape,
+   only the leftmost ~--play-h is visible). Both share grid-area "row"
+   so they stack; play-btn has margin-left so count-in's icon area peeks
+   out, and z-index keeps Start on top.
+   --play-h drives both heights so the visible shapes match pixel-perfect. */
 .play-row {
   --play-h: 60px;
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-areas: "row";
   height: var(--play-h);
 }
 
 .countin-btn {
-  flex: 0 0 var(--play-h);
-  width: var(--play-h);
-  height: var(--play-h);
+  grid-area: row;
+  width: 100%;
+  height: 100%;
   border: none;
-  border-radius: 50%;
+  border-radius: 100px;
   background: var(--card);
   color: var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.06s ease;
+  z-index: 1;
+}
+
+/* Fixed-width left section so the icon (and the armed number) always
+   sit at the same x position regardless of which is shown. Width matches
+   --play-h so the icon visually centers in what looks like the round
+   "tab" sticking out from under the Start button. */
+.countin-btn-content {
+  width: var(--play-h);
+  height: 100%;
   display: grid;
   place-items: center;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.06s ease;
+  flex-shrink: 0;
 }
-.countin-btn svg { width: 22px; height: 22px; }
-.countin-btn:hover { color: var(--accent); }
-.countin-btn:active { transform: scale(0.96); background: var(--card-2); }
-.countin-btn:disabled { opacity: 0.5; cursor: default; }
-.countin-btn.armed { color: var(--accent); }
 
-/* Play button — pill, big yellow, like the FAB style adapted */
+.countin-btn svg { width: 22px; height: 22px; }
+.countin-btn-num {
+  display: none;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.countin-btn:hover { color: var(--accent); }
+.countin-btn:active { transform: scale(0.99); background: var(--card-2); }
+.countin-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Armed state — count-in is set, waiting for the user to press Start.
+   White pill with the chosen seconds shown where the icon was. */
+.countin-btn.armed { background: var(--fg); color: var(--bg); }
+.countin-btn.armed svg { display: none; }
+.countin-btn.armed .countin-btn-num { display: block; }
+.countin-btn.armed:hover { color: var(--bg); }
+
+/* Play button — pill, big yellow, sits on top of count-in.
+   margin-left = visible count-in width + a small "lip" so the rounded
+   countin tab is fully visible to the left of Start. */
 .play-btn {
-  flex: 1 1 auto;
+  grid-area: row;
+  margin-left: calc(var(--play-h) + 10px);
   height: var(--play-h);
   padding: 0 24px;
+  z-index: 2;
   border: none;
   border-radius: 100px;
   background: var(--accent);
@@ -1610,6 +1645,27 @@ details > *:last-child { padding-bottom: 16px; }
 }
 
 .countin-option:active { transform: scale(0.97); background: var(--card-3); }
+
+.countin-option.is-active {
+  background: var(--accent);
+  color: #000;
+}
+
+.countin-clear {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.countin-clear:hover { color: var(--fg); }
+.countin-clear.is-active { color: var(--fg); font-weight: 600; }
 
 /* === Count-in countdown overlay === */
 .countin-overlay {

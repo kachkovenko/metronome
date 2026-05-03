@@ -102,10 +102,13 @@
 
         <div class="play-row">
           <button id="countin-btn" class="countin-btn" aria-label="Отложенный старт">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="9"/>
-              <polyline points="12 7 12 12 15 14"/>
-            </svg>
+            <span class="countin-btn-content">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <polyline points="12 7 12 12 15 14"/>
+              </svg>
+              <span class="countin-btn-num" id="countin-btn-num"></span>
+            </span>
           </button>
           <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
             <span class="play-icon">▶</span>
@@ -421,13 +424,14 @@
     <div class="sheet">
       <div class="sheet-handle"></div>
       <h3>Отложенный старт</h3>
-      <p class="muted small">Метроном начнёт стучать сразу после выбора. Большая цифра на экране отсчитает выбранную длительность.</p>
+      <p class="muted small">Выбери задержку — кнопка станет белой и покажет число. Отсчёт начнётся, когда нажмёшь Старт.</p>
       <div class="countin-options">
         <button class="countin-option" data-sec="3">3 сек</button>
         <button class="countin-option" data-sec="5">5 сек</button>
         <button class="countin-option" data-sec="7">7 сек</button>
         <button class="countin-option" data-sec="10">10 сек</button>
       </div>
+      <button class="countin-clear" data-sec="0">Без задержки</button>
     </div>
   </div>
 
