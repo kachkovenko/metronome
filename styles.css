@@ -1472,7 +1472,7 @@ details > *:last-child { padding-bottom: 16px; }
      height tracks the SHORT axis (vmin) so they fit between the safe
      paddings. Works the same in native landscape and CSS-rotated portrait
      (since vmin/vmax always reference the actual viewport). */
-  width: clamp(110px, 17vmax, 280px);
+  width: clamp(90px, 14vmax, 240px);
   height: clamp(280px, 88vmin, 540px);
   gap: clamp(14px, 3.5vmin, 32px);
   padding: clamp(18px, 3.5vmin, 32px) 0;
@@ -1487,8 +1487,13 @@ details > *:last-child { padding-bottom: 16px; }
 .flash-controls {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   align-items: flex-end;
+  /* Center the column vertically so close/play/lamp don't stretch to the
+     extreme top/bottom of the grid row (which would push lamp into the
+     phone's bottom edge as soon as stacks get tall). The natural column
+     height = close + play + lamp + 2 gaps, comfortably under viewport. */
+  align-self: center;
+  gap: clamp(28px, 6vmin, 64px);
   z-index: 2;
 }
 
