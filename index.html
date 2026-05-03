@@ -17,7 +17,14 @@
   </script>
   <!-- /Yandex.Metrika counter -->
 
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#000000" id="meta-theme-color">
+  <script>
+    // Apply persisted theme before stylesheets paint to avoid flash
+    try {
+      const t = localStorage.getItem('metronome.theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch {}
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Метроном">
@@ -43,6 +50,19 @@
       <!-- Tab: Метроном -->
       <section class="tab-view active" id="tab-metronome" data-tab="metronome">
         <section class="bpm-card">
+          <button id="presets-btn" class="bpm-icon-btn bpm-icon-btn--left" aria-label="Пресеты">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+          <button id="fullscreen-btn" class="bpm-icon-btn bpm-icon-btn--right" aria-label="Полноэкранный режим">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 9V5a1 1 0 0 1 1-1h4"/>
+              <path d="M20 9V5a1 1 0 0 0-1-1h-4"/>
+              <path d="M4 15v4a1 1 0 0 0 1 1h4"/>
+              <path d="M20 15v4a1 1 0 0 1-1 1h-4"/>
+            </svg>
+          </button>
           <div class="bpm-display">
             <input id="bpm-input" type="number" min="30" max="300" value="100" inputmode="numeric">
             <span class="bpm-label">BPM</span>
@@ -80,10 +100,18 @@
           <div id="beat-indicator" class="beat-indicator"></div>
         </section>
 
-        <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
-          <span class="play-icon">▶</span>
-          <span class="play-text">СТАРТ</span>
-        </button>
+        <div class="play-row">
+          <button id="countin-btn" class="countin-btn" aria-label="Отложенный старт">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 7 12 12 15 14"/>
+            </svg>
+          </button>
+          <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
+            <span class="play-icon">▶</span>
+            <span class="play-text">СТАРТ</span>
+          </button>
+        </div>
 
         <div id="mic-live" class="mic-live" hidden>
           <span class="mic-live-offset" id="mic-live-offset">—</span>
@@ -153,6 +181,14 @@
       <!-- Tab: Настройки -->
       <section class="tab-view" id="tab-settings" data-tab="settings">
         <details>
+          <summary>Тема</summary>
+          <div class="presets" id="theme-picker">
+            <button class="preset" data-theme="dark">Тёмная</button>
+            <button class="preset" data-theme="light">Светлая</button>
+          </div>
+        </details>
+
+        <details>
           <summary>Громкость</summary>
           <div class="vol">
             <label>Общая <output id="vol-master-out">70</output>%</label>
@@ -191,16 +227,6 @@
             <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
             <button class="preset" data-bt-preset="200">AirPods</button>
           </div>
-        </details>
-
-        <details>
-          <summary>Пресеты</summary>
-          <div class="presets" id="builtin-presets"></div>
-          <div class="user-presets">
-            <input id="preset-name" type="text" placeholder="Название пресета" maxlength="30">
-            <button id="preset-save">Сохранить</button>
-          </div>
-          <div class="presets" id="user-presets"></div>
         </details>
 
         <p class="muted small">Установить как приложение: меню браузера → «Установить» / «На экран Домой»</p>
@@ -280,6 +306,21 @@
     </div>
   </div>
 
+  <!-- Presets modal -->
+  <div id="presets-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Пресеты</h3>
+      <div class="presets" id="builtin-presets"></div>
+      <div class="user-presets">
+        <input id="preset-name" type="text" placeholder="Название пресета" maxlength="30">
+        <button id="preset-save">Сохранить</button>
+      </div>
+      <div class="presets" id="user-presets"></div>
+    </div>
+  </div>
+
   <!-- Walkthrough screen -->
   <div id="walk-screen" class="fullscreen" aria-hidden="true">
     <header class="fs-header">
@@ -328,6 +369,103 @@
       <button class="walk-btn" id="walk-bpm-up">+5 BPM</button>
       <button class="walk-btn primary" id="walk-next">Дальше →</button>
     </footer>
+  </div>
+
+  <!-- Fullscreen flash view -->
+  <div id="flash-screen" class="flash-screen" aria-hidden="true">
+    <!-- overlays sit BEHIND the grid items (z-index 1) so stacks stay readable while flashing -->
+    <div class="flash-overlay flash-overlay-full" id="flash-overlay-full"></div>
+    <div class="flash-overlay flash-overlay-half" id="flash-overlay-half"></div>
+
+    <div class="flash-info">
+      <div class="flash-info-item">
+        <span class="flash-info-label">BPM</span>
+        <span class="flash-info-value" id="flash-bpm">100</span>
+      </div>
+      <div class="flash-info-item">
+        <span class="flash-info-label">Размер</span>
+        <span class="flash-info-value" id="flash-timesig">4/4</span>
+      </div>
+      <div class="flash-info-item">
+        <span class="flash-info-label">Деления</span>
+        <span class="flash-info-value" id="flash-sub">♩</span>
+      </div>
+    </div>
+
+    <div class="flash-stacks">
+      <div id="flash-beat-indicator" class="beat-indicator beat-indicator--big"></div>
+    </div>
+
+    <div class="flash-controls">
+      <button class="icon-btn" id="flash-close" aria-label="Закрыть">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+      <button class="flash-play-btn" id="flash-play" aria-label="Старт/Стоп">
+        <span class="flash-play-icon">▶</span>
+      </button>
+      <button class="icon-btn flash-lamp-btn" id="flash-lamp" aria-label="Режим вспышек" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21h6"/>
+          <path d="M10 17h4"/>
+          <path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6V17h5.4v-1.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Count-in (delayed start) modal -->
+  <div id="countin-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Отложенный старт</h3>
+      <p class="muted small">Метроном начнёт стучать сразу после выбора. Большая цифра на экране отсчитает выбранную длительность.</p>
+      <div class="countin-options">
+        <button class="countin-option" data-sec="3">3 сек</button>
+        <button class="countin-option" data-sec="5">5 сек</button>
+        <button class="countin-option" data-sec="7">7 сек</button>
+        <button class="countin-option" data-sec="10">10 сек</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Count-in countdown overlay -->
+  <div id="countin-overlay" class="countin-overlay" aria-hidden="true">
+    <div class="countin-num" id="countin-num">5</div>
+  </div>
+
+  <!-- Training tab "coming soon" notice — shown on every tab switch to Training -->
+  <div id="training-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Раздел в разработке</h3>
+      <p class="muted">Скоро (в течение 3-5 дней) тут появится много интересного.</p>
+      <div class="warning-actions training-actions">
+        <button class="warning-ok" id="training-ok">Буду знать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Epilepsy warning before enabling lamp/flash mode -->
+  <div id="flash-warning-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Внимание: вспышки экрана</h3>
+      <p class="muted">Полноэкранные вспышки на высоких BPM могут вызывать дискомфорт у людей с фоточувствительной эпилепсией. Если у тебя или рядом есть такие — лучше пропустить.</p>
+      <p class="muted small">Используется только акцент на полную площадь, остальные доли — на верхней половине с пониженным контрастом и плавным затуханием.</p>
+      <label class="toggle">
+        <input id="flash-warning-skip" type="checkbox">
+        <span>Больше не показывать</span>
+      </label>
+      <div class="warning-actions">
+        <button class="warning-cancel" id="flash-warning-cancel">Отмена</button>
+        <button class="warning-ok" id="flash-warning-ok">Включить</button>
+      </div>
+    </div>
   </div>
 
   <script src="./app.js"></script>

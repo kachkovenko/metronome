@@ -7,6 +7,11 @@
   --muted: #8a8a8a;
   --accent: #d5ff3c;
   --accent-soft: rgba(213, 255, 60, 0.15);
+  /* Accent for text/icons/thin strokes. In dark theme = lime (great contrast on
+     dark bg). In light theme overridden to a darker chartreuse — lime-700 —
+     because pure lime is invisible on white. Keeps brand feel without losing
+     legibility. */
+  --accent-text: var(--accent);
   --border: #262626;
   --radius-lg: 28px;
   --radius-md: 20px;
@@ -69,7 +74,7 @@ button, input, select, textarea {
 /* Метроном tab: keep no-scroll behavior, play button anchors to bottom */
 #tab-metronome { overflow: hidden; padding-bottom: 8px; }
 #tab-metronome > * { flex-shrink: 0; }
-#tab-metronome > .play-btn { margin-top: auto; }
+#tab-metronome > .play-row { margin-top: auto; }
 
 /* Training & Settings tabs: scroll inside the tab area */
 #tab-training,
@@ -164,6 +169,7 @@ button, input, select, textarea {
 
 /* BPM card */
 .bpm-card {
+  position: relative;
   background: var(--card);
   border-radius: var(--radius-lg);
   padding: 16px 16px 14px;
@@ -171,6 +177,28 @@ button, input, select, textarea {
   flex-direction: column;
   gap: 12px;
 }
+
+.bpm-icon-btn {
+  position: absolute;
+  top: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.06s ease;
+  z-index: 2;
+}
+
+.bpm-icon-btn--left { left: 12px; }
+.bpm-icon-btn--right { right: 12px; }
+.bpm-icon-btn svg { width: 18px; height: 18px; }
+.bpm-icon-btn:hover { color: var(--fg); }
+.bpm-icon-btn:active { transform: scale(0.94); background: var(--card-3); }
 
 .bpm-display {
   display: flex;
@@ -428,10 +456,42 @@ button, input, select, textarea {
   box-shadow: 0 0 10px rgba(213, 255, 60, 0.7);
 }
 
-/* Play button — full-width pill, big yellow, like the FAB style adapted */
+/* Play row — count-in button (round) + main start button (pill).
+   Both buttons share the same explicit height via --play-h so the round
+   button's diameter matches the pill's height pixel-for-pixel. (Relying on
+   align-items: stretch + aspect-ratio: 1 left a few-px gap in flex layout
+   because the SVG's intrinsic width fed back into the basis calculation.) */
+.play-row {
+  --play-h: 60px;
+  display: flex;
+  gap: 10px;
+  height: var(--play-h);
+}
+
+.countin-btn {
+  flex: 0 0 var(--play-h);
+  width: var(--play-h);
+  height: var(--play-h);
+  border: none;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--fg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.06s ease;
+}
+.countin-btn svg { width: 22px; height: 22px; }
+.countin-btn:hover { color: var(--accent); }
+.countin-btn:active { transform: scale(0.96); background: var(--card-2); }
+.countin-btn:disabled { opacity: 0.5; cursor: default; }
+.countin-btn.armed { color: var(--accent); }
+
+/* Play button — pill, big yellow, like the FAB style adapted */
 .play-btn {
-  width: 100%;
-  padding: 18px;
+  flex: 1 1 auto;
+  height: var(--play-h);
+  padding: 0 24px;
   border: none;
   border-radius: 100px;
   background: var(--accent);
@@ -1236,11 +1296,87 @@ details > *:last-child { padding-bottom: 16px; }
 
 @media (max-width: 380px) {
   #bpm-input { font-size: 64px; width: 150px; }
-  .play-btn { font-size: 17px; padding: 16px; }
+  .play-row { --play-h: 54px; }
+  .play-btn { font-size: 17px; padding: 0 20px; }
   .grid2 { grid-template-columns: 1fr; }
   .time-sig-display { font-size: 32px; }
   .sub-display { font-size: 32px; }
 }
+
+/* === Light theme === */
+/* Default :root above is dark. Light theme is a switch via <html data-theme="light">. */
+[data-theme="light"] {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --card-2: #ececef;
+  --card-3: #dcdce0;
+  --fg: #0a0a0a;
+  --muted: #6b6b70;
+  --accent: #d5ff3c;
+  --accent-soft: rgba(213, 255, 60, 0.45);
+  /* lime-700 — readable on white (~5.5:1) while staying in the same hue
+     family as the lime fill. Used wherever dark theme paints text/strokes
+     in --accent. */
+  --accent-text: #4d7c0f;
+  --border: #d8d8dc;
+}
+
+/* Subtle elevation on cards in light theme — without it surfaces blend into bg */
+[data-theme="light"] .bpm-card,
+[data-theme="light"] .mini-card,
+[data-theme="light"] .beat-card,
+[data-theme="light"] details,
+[data-theme="light"] .session-card,
+[data-theme="light"] .walk-meta,
+[data-theme="light"] .walk-sticking,
+[data-theme="light"] .walk-groove {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .walk-btn { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); }
+[data-theme="light"] .sheet { box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08); }
+
+/* Tick row needs darker color than rgba(255,255,255,0.28) on white */
+[data-theme="light"] .wheel-tick { background: rgba(0, 0, 0, 0.22); }
+
+/* These rules only differ structurally (drop dark-theme glow shadows that
+   look wrong on white); accent text/stroke colors come from --accent-text
+   automatically because the base rules already use var(--accent) — but
+   the base rules use var(--accent), not var(--accent-text). So we still
+   override here, just with --accent-text for branded look. */
+[data-theme="light"] .wheel-center { background: var(--accent-text); box-shadow: none; }
+[data-theme="light"] .sub-display { color: var(--accent-text); }
+[data-theme="light"] .beat-stack[data-type="accent"] .bdot { background: var(--accent-text); }
+[data-theme="light"] .beat-stack.active[data-type="accent"] .bdot {
+  box-shadow: none;
+  transform: scale(1.25);
+}
+[data-theme="light"] .play-btn { box-shadow: none; }
+[data-theme="light"] .play-btn.playing { background: var(--fg); color: #fff; box-shadow: none; }
+[data-theme="light"] .vol input[type="range"]::-webkit-slider-thumb,
+[data-theme="light"] #mute-pct::-webkit-slider-thumb { background: var(--accent-text); }
+[data-theme="light"] .vol input[type="range"]::-moz-range-thumb,
+[data-theme="light"] #mute-pct::-moz-range-thumb { background: var(--accent-text); }
+[data-theme="light"] .toggle input { accent-color: var(--accent-text); }
+[data-theme="light"] .preset { background: var(--card-2); }
+[data-theme="light"] .preset.is-active { background: var(--accent); color: #000; box-shadow: none; }
+[data-theme="light"] .preset-del { background: var(--card-2); }
+[data-theme="light"] .preset-del:hover { color: var(--accent-text); }
+[data-theme="light"] .grid2 input,
+[data-theme="light"] .row-inline select,
+[data-theme="light"] .user-presets input { background: var(--card-2); }
+[data-theme="light"] .bt-detected-line code { background: var(--card-2); }
+[data-theme="light"] .modal-backdrop { background: rgba(0, 0, 0, 0.35); }
+[data-theme="light"] .sub-option .sub-glyph { color: var(--accent-text); }
+[data-theme="light"] .time-grid button.active { color: var(--accent-text); }
+[data-theme="light"] .session-card-blocks span::before { color: var(--accent-text); }
+[data-theme="light"] .walk-meta-value { color: var(--accent-text); }
+[data-theme="light"] .walk-sticking { color: var(--accent-text); }
+[data-theme="light"] .groove-mark.x { border-color: var(--accent-text); color: var(--accent-text); }
+[data-theme="light"] .groove-mark.o { background: var(--accent-text); }
+[data-theme="light"] .walk-timer-bar-fill { background: var(--accent-text); }
+[data-theme="light"] .update-btn:hover { border-color: var(--accent-text); color: var(--accent-text); }
+[data-theme="light"] .update-toast { background: var(--fg); color: var(--card); }
+[data-theme="light"] .tab-bar-item.active { color: var(--accent-text); }
 
 /* Very short screens (iPhone SE territory) — compress further so everything fits without scroll */
 @media (max-height: 720px) {
@@ -1258,8 +1394,251 @@ details > *:last-child { padding-bottom: 16px; }
   .beat-card { padding: 8px 10px; }
   .beat-stack { width: 38px; height: 56px; gap: 4px; padding: 6px 0; }
   .beat-stack .bdot { width: 10px; height: 10px; }
-  .play-btn { padding: 14px; font-size: 16px; }
+  .play-row { --play-h: 50px; }
+  .play-btn { padding: 0 16px; font-size: 16px; }
   .topbar { padding: 2px 4px 2px; }
   .brand { font-size: 16px; }
   .icon-btn { width: 38px; height: 38px; }
 }
+
+/* === Fullscreen flash view === */
+.flash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: none;
+  background: var(--bg);
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.flash-screen.open {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 20px;
+  align-items: stretch;
+  animation: fadeIn 0.18s ease;
+}
+
+.flash-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  z-index: 2;
+}
+
+.flash-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 64px;
+}
+
+.flash-info-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.flash-info-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .flash-info-value { color: var(--fg); }
+
+.flash-stacks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.beat-indicator--big {
+  gap: clamp(10px, 2.5vmin, 24px);
+  flex-wrap: nowrap;
+}
+
+.beat-indicator--big .beat-stack {
+  /* vmin so the size is consistent regardless of orientation/rotation */
+  width: clamp(80px, 14vmin, 220px);
+  height: clamp(260px, 70vmin, 540px);
+  gap: clamp(12px, 2.5vmin, 26px);
+  padding: clamp(16px, 3vmin, 28px) 0;
+  border-radius: clamp(16px, 2.5vmin, 28px);
+}
+
+.beat-indicator--big .beat-stack .bdot {
+  width: clamp(14px, 3vmin, 30px);
+  height: clamp(14px, 3vmin, 30px);
+}
+
+.flash-controls {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  z-index: 2;
+}
+
+.flash-lamp-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Big round Start/Stop button in the middle of the controls column */
+.flash-play-btn {
+  width: 72px;
+  height: 72px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(213, 255, 60, 0.25);
+  transition: transform 0.08s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.flash-play-btn:active { transform: scale(0.95); }
+.flash-play-btn.playing { background: var(--fg); color: var(--bg); box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15); }
+[data-theme="light"] .flash-play-btn { box-shadow: none; }
+[data-theme="light"] .flash-play-btn.playing { background: var(--fg); color: #fff; box-shadow: none; }
+
+.flash-play-icon {
+  font-size: 26px;
+  line-height: 1;
+  /* SF rendering of ▶ leans slightly right; nudge left for optical centering */
+  margin-left: 3px;
+}
+.flash-play-btn.playing .flash-play-icon { margin-left: 0; }
+
+/* Lime overlays — z-index 1 so they sit BEHIND the grid columns (info / stacks /
+   controls) which are z-index 2. Stacks remain readable while screen pulses. */
+.flash-overlay {
+  position: absolute;
+  pointer-events: none;
+  background: var(--accent);
+  opacity: 0;
+  z-index: 1;
+}
+.flash-overlay-full { inset: 0; }
+.flash-overlay-half { top: 0; left: 0; right: 0; height: 50%; }
+
+.flash-overlay.flash-pulse-full { animation: flashPulseFull 0.18s ease-out; }
+.flash-overlay.flash-pulse-half { animation: flashPulseHalf 0.18s ease-out; }
+@keyframes flashPulseFull { 0% { opacity: 0.5; } 100% { opacity: 0; } }
+@keyframes flashPulseHalf { 0% { opacity: 0.28; } 100% { opacity: 0; } }
+
+/* Portrait phone — pre-rotate the fullscreen content 90° clockwise so the
+   user only has to physically turn the phone 90° left to read it upright.
+   When the phone is actually held in landscape (orientation: landscape),
+   this rule doesn't apply and the layout is rendered natively.
+   Desktop is matched by `pointer: coarse` filter — only touch + portrait
+   triggers rotation. */
+@media (orientation: portrait) and (pointer: coarse), (orientation: portrait) and (max-width: 900px) {
+  .flash-screen.open {
+    width: 100dvh;
+    height: 100dvw;
+    transform: rotate(90deg);
+    transform-origin: 50dvmin 50dvmin;
+    /* In rotated frame, content's edges map to phone edges as:
+         content-top    ← phone-right
+         content-right  ← phone-bottom (home indicator)
+         content-bottom ← phone-left
+         content-left   ← phone-top (notch)
+       So we feed the env() insets to the matching content side. */
+    padding:
+      max(16px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left))
+      max(16px, env(safe-area-inset-top));
+  }
+}
+
+/* === Count-in popup options === */
+.countin-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.countin-option {
+  padding: 18px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--card-2);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.countin-option:active { transform: scale(0.97); background: var(--card-3); }
+
+/* === Count-in countdown overlay === */
+.countin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+.countin-overlay.open { display: flex; animation: fadeIn 0.18s ease; }
+
+.countin-num {
+  font-size: clamp(120px, 28vw, 240px);
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+/* === Epilepsy warning modal === */
+.warning-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.warning-cancel,
+.warning-ok {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: none;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.warning-cancel { background: var(--card-2); color: var(--fg); }
+.warning-ok { background: var(--accent); color: #000; }
+.warning-cancel:active,
+.warning-ok:active { transform: scale(0.98); }
+
+/* The flash-warning modal is triggered FROM inside fullscreen, so it must
+   layer above .flash-screen (z-index 120). Other modals stay at 110 — they
+   only open from the main view, which is hidden behind fullscreen anyway. */
+#flash-warning-modal { z-index: 140; }
+
+/* Single-button variant of warning-actions (one CTA spans the row) */
+.training-actions { grid-template-columns: 1fr; }

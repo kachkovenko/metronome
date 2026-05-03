@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.8.0';
 
 const state = {
   bpm: 100,
@@ -45,11 +45,23 @@ const state = {
   micEnabled: false,
   // System input latency compensation in ms (Stage 2 will add calibration UI)
   inputLatencyMs: 0,
+
+  // Fullscreen flash mode (lamp toggle inside fullscreen view)
+  flashEnabled: false,
+
+  // Count-in (delayed start with audible click-through)
+  countinActive: false,
+  countinTimer: null,
+  countinSec: 0,
 };
 
 const BT_LATENCY_KEY = 'metronome.bt-latency-ms';
 const BT_AUTO_KEY = 'metronome.bt-auto';
 const INPUT_LATENCY_KEY = 'metronome.input-latency-ms';
+const THEME_KEY = 'metronome.theme';
+const FLASH_WARNING_KEY = 'metronome.flash-warning-acked';
+
+const THEME_COLORS = { dark: '#000000', light: '#f5f5f7' };
 
 let audioCtx = null;
 let silentAudio = null;
@@ -81,6 +93,26 @@ const BUILTIN_PRESETS = [
   { name: 'Шаффл (110, 4/4 ♪³)', bpm: 110, num: 4, den: 4, sub: 3 },
   { name: '6/8 (90)', bpm: 90, num: 6, den: 8, sub: 1 },
 ];
+
+// --- Theme ---
+
+function loadTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return (t === 'light' || t === 'dark') ? t : 'dark';
+  } catch { return 'dark'; }
+}
+
+function applyTheme(name) {
+  const t = (name === 'light') ? 'light' : 'dark';
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem(THEME_KEY, t); } catch {}
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) meta.setAttribute('content', THEME_COLORS[t]);
+  document.querySelectorAll('#theme-picker .preset').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.theme === t);
+  });
+}
 
 // --- Audio scheduling ---
 
@@ -198,6 +230,7 @@ function stop() {
   clearBeatIndicator();
   updatePlayButton();
   releaseWakeLock();
+  if (state.countinActive) cancelCountin();
 }
 
 function toggle() {
@@ -232,9 +265,13 @@ function draw() {
 }
 
 function highlightBeat(beat) {
-  document.querySelectorAll('.beat-stack').forEach((s, i) => {
-    s.classList.toggle('active', i === beat);
+  // Match by data-beat (not by NodeList index): with a second indicator in
+  // the fullscreen view, both share the same beat numbers but live in
+  // different parents. Multiple .beat-stack[data-beat="0"] should all light up.
+  document.querySelectorAll('.beat-stack').forEach(s => {
+    s.classList.toggle('active', Number(s.dataset.beat) === beat);
   });
+  if (state.flashEnabled) triggerFlash(beat);
 }
 
 function clearBeatIndicator() {
@@ -249,11 +286,14 @@ function rebuildBeatIndicator() {
     state.beatTypes.push('beat');
   }
   state.beatTypes.length = state.beatsPerMeasure;
-  if (state.beatTypes[0] === 'mute' || state.beatTypes[0] === 'soft') {
-    // first beat defaults to accent if newly resized; leave alone if user set it
-  }
 
-  const el = $('beat-indicator');
+  renderBeatStacks('beat-indicator');
+  renderBeatStacks('flash-beat-indicator');
+}
+
+function renderBeatStacks(targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
   el.innerHTML = '';
   for (let i = 0; i < state.beatsPerMeasure; i++) {
     const stack = document.createElement('button');
@@ -272,11 +312,11 @@ function cycleBeat(i) {
   const idx = BEAT_CYCLE.indexOf(current);
   const next = BEAT_CYCLE[(idx + 1) % BEAT_CYCLE.length];
   state.beatTypes[i] = next;
-  const stack = document.querySelector(`.beat-stack[data-beat="${i}"]`);
-  if (stack) {
+  // Update every instance of this beat across both indicators
+  document.querySelectorAll(`.beat-stack[data-beat="${i}"]`).forEach(stack => {
     stack.dataset.type = next;
     stack.setAttribute('aria-label', `Доля ${i + 1}: ${next}`);
-  }
+  });
 }
 
 // --- Display updaters ---
@@ -346,6 +386,8 @@ function setBpm(v) {
   v = Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(v)));
   state.bpm = v;
   $('bpm-input').value = v;
+  const flashBpm = $('flash-bpm');
+  if (flashBpm) flashBpm.textContent = v;
   const wheel = $('bpm-wheel');
   if (wheel) {
     wheel.setAttribute('aria-valuenow', String(v));
@@ -357,6 +399,8 @@ function updateSubDisplay() {
   const meta = SUB_META[state.subdivision];
   $('sub-symbol').textContent = meta.symbol;
   $('sub-label').textContent = meta.label;
+  const flashSub = $('flash-sub');
+  if (flashSub) flashSub.textContent = meta.symbol;
   document.querySelectorAll('.sub-option').forEach(b => {
     b.classList.toggle('active', Number(b.dataset.sub) === state.subdivision);
   });
@@ -365,6 +409,8 @@ function updateSubDisplay() {
 function updateTimeDisplay() {
   $('time-num-out').textContent = state.beatsPerMeasure;
   $('time-den-out').textContent = state.beatUnit;
+  const flashSig = $('flash-timesig');
+  if (flashSig) flashSig.textContent = `${state.beatsPerMeasure}/${state.beatUnit}`;
   document.querySelectorAll('#time-grid button').forEach(b => {
     const n = Number(b.dataset.num);
     const d = Number(b.dataset.den);
@@ -378,6 +424,14 @@ function updatePlayButton() {
   btn.classList.toggle('playing', state.isPlaying);
   btn.querySelector('.play-icon').textContent = state.isPlaying ? '■' : '▶';
   btn.querySelector('.play-text').textContent = state.isPlaying ? 'СТОП' : 'СТАРТ';
+  const cin = $('countin-btn');
+  if (cin) cin.disabled = state.isPlaying || state.countinActive;
+  // Sync the in-fullscreen Start/Stop button (icon-only)
+  const flashPlay = $('flash-play');
+  if (flashPlay) {
+    flashPlay.classList.toggle('playing', state.isPlaying);
+    flashPlay.querySelector('.flash-play-icon').textContent = state.isPlaying ? '■' : '▶';
+  }
 }
 
 // --- Tap tempo ---
@@ -453,7 +507,7 @@ function renderBuiltinPresets() {
     b.className = 'preset';
     b.dataset.presetSig = sig;
     b.textContent = p.name;
-    b.addEventListener('click', () => applyPreset(p, sig));
+    b.addEventListener('click', () => { applyPreset(p, sig); closeModal('presets-modal'); });
     root.appendChild(b);
   });
   updateActivePresetUI();
@@ -484,7 +538,7 @@ function renderUserPresets() {
     b.className = 'preset';
     b.dataset.presetSig = sig;
     b.textContent = `${p.name} · ${p.bpm} BPM`;
-    b.addEventListener('click', () => applyPreset(p, sig));
+    b.addEventListener('click', () => { applyPreset(p, sig); closeModal('presets-modal'); });
     const del = document.createElement('button');
     del.className = 'preset-del';
     del.textContent = '✕';
@@ -538,6 +592,9 @@ function switchTab(tabId) {
   $('page-title').textContent = TAB_TITLES[tabId];
   // Re-evaluate active preset highlight when entering Settings
   if (tabId === 'settings') checkActivePresetStillMatches();
+  // Show "in development" notice every time the user opens Training (the tab
+  // is currently a placeholder; the modal will go away once content lands).
+  if (tabId === 'training') openModal('training-modal');
 }
 
 function openModal(id) {
@@ -668,6 +725,46 @@ function bind() {
   // Time signature modal
   $('time-sig-btn').addEventListener('click', () => openModal('time-modal'));
 
+  // Presets modal
+  $('presets-btn').addEventListener('click', () => openModal('presets-modal'));
+
+  // Theme picker
+  document.querySelectorAll('#theme-picker .preset').forEach(b => {
+    b.addEventListener('click', () => applyTheme(b.dataset.theme));
+  });
+
+  // Fullscreen flash view
+  $('fullscreen-btn').addEventListener('click', openFlashScreen);
+  $('flash-close').addEventListener('click', closeFlashScreen);
+  $('flash-lamp').addEventListener('click', tryToggleLamp);
+  $('flash-play').addEventListener('click', toggle);
+
+  // Training tab placeholder
+  $('training-ok').addEventListener('click', () => closeModal('training-modal'));
+
+  // Epilepsy warning modal
+  $('flash-warning-cancel').addEventListener('click', () => closeModal('flash-warning-modal'));
+  $('flash-warning-ok').addEventListener('click', () => {
+    if ($('flash-warning-skip').checked) {
+      try { localStorage.setItem(FLASH_WARNING_KEY, '1'); } catch {}
+    }
+    closeModal('flash-warning-modal');
+    setFlashMode(true);
+  });
+
+  // Count-in (delayed start)
+  $('countin-btn').addEventListener('click', () => {
+    if (state.isPlaying || state.countinActive) return;
+    openModal('countin-modal');
+  });
+  document.querySelectorAll('.countin-option').forEach(b => {
+    b.addEventListener('click', () => {
+      const sec = Number(b.dataset.sec);
+      closeModal('countin-modal');
+      startCountin(sec);
+    });
+  });
+
   // Modal backdrops
   document.querySelectorAll('[data-close]').forEach(el => {
     el.addEventListener('click', () => {
@@ -767,6 +864,11 @@ function bind() {
     else if (e.code === 'Escape') {
       closeModal('sub-modal');
       closeModal('time-modal');
+      closeModal('presets-modal');
+      closeModal('countin-modal');
+      closeModal('flash-warning-modal');
+      closeModal('training-modal');
+      if ($('flash-screen').classList.contains('open')) closeFlashScreen();
     }
   });
 
@@ -1378,6 +1480,123 @@ function startWalkTimer(durationSec) {
   walk.timerInterval = setInterval(tick, 250);
 }
 
+// --- Fullscreen flash view ---
+
+function openFlashScreen() {
+  // Build big stacks if not yet built (or rebuild on first open after a sig change)
+  renderBeatStacks('flash-beat-indicator');
+  // Sync info displays from current state
+  $('flash-bpm').textContent = state.bpm;
+  $('flash-timesig').textContent = `${state.beatsPerMeasure}/${state.beatUnit}`;
+  $('flash-sub').textContent = SUB_META[state.subdivision]?.symbol || '♩';
+  // Re-apply current beat highlight (so an already-playing metronome shows up)
+  if (state.isPlaying) {
+    document.querySelectorAll('.beat-stack').forEach(s => {
+      const isActive = Number(s.dataset.beat) === state.currentBeat;
+      s.classList.toggle('active', isActive);
+    });
+  }
+  const el = $('flash-screen');
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+}
+
+function closeFlashScreen() {
+  const el = $('flash-screen');
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+  // Lamp mode is scoped to fullscreen — turn off when leaving
+  if (state.flashEnabled) setFlashMode(false);
+}
+
+function setFlashMode(on) {
+  state.flashEnabled = !!on;
+  const lamp = $('flash-lamp');
+  if (lamp) lamp.setAttribute('aria-pressed', state.flashEnabled ? 'true' : 'false');
+}
+
+function tryToggleLamp() {
+  if (state.flashEnabled) { setFlashMode(false); return; }
+  // First-time activation — show epilepsy warning unless previously acked
+  let acked = false;
+  try { acked = localStorage.getItem(FLASH_WARNING_KEY) === '1'; } catch {}
+  if (acked) { setFlashMode(true); return; }
+  openModal('flash-warning-modal');
+}
+
+// Fired from highlightBeat() when state.flashEnabled is true.
+// Mitigations per WCAG 2.3.1: low peak opacity, fast fade, accent gets
+// full screen but it's the rarer beat; non-accent gets only top half with
+// even lower contrast.
+function triggerFlash(beat) {
+  const beatType = state.beatTypes[beat] || 'beat';
+  if (beatType === 'mute') return;
+  const isAccent = beatType === 'accent';
+  const overlay = isAccent ? $('flash-overlay-full') : $('flash-overlay-half');
+  if (!overlay) return;
+  const cls = isAccent ? 'flash-pulse-full' : 'flash-pulse-half';
+  // Restart animation by toggling class
+  overlay.classList.remove(cls);
+  void overlay.offsetWidth;
+  overlay.classList.add(cls);
+}
+
+// --- Count-in (delayed start) ---
+
+const COUNTIN_OPTIONS = [3, 5, 7, 10];
+
+async function startCountin(sec) {
+  if (state.isPlaying || state.countinActive) return;
+  state.countinActive = true;
+  state.countinSec = sec;
+
+  const overlay = $('countin-overlay');
+  const num = $('countin-num');
+  let remaining = sec;
+  num.textContent = remaining;
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  $('countin-btn')?.classList.add('armed');
+
+  // Kick off the metronome — clicks will be audible throughout the countdown,
+  // and after the overlay disappears the same scheduler keeps running, so
+  // there's no perceptible "switch" between count-in and the real start.
+  try { await start(); } catch {}
+  // Bail out if start() failed (no audio) or the user already pressed Stop
+  if (!state.isPlaying || !state.countinActive) {
+    finishCountin();
+    return;
+  }
+
+  state.countinTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      finishCountin();
+    } else {
+      num.textContent = remaining;
+    }
+  }, 1000);
+}
+
+function finishCountin() {
+  if (state.countinTimer) {
+    clearInterval(state.countinTimer);
+    state.countinTimer = null;
+  }
+  state.countinActive = false;
+  const overlay = $('countin-overlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  $('countin-btn')?.classList.remove('armed');
+}
+
+function cancelCountin() {
+  // Called from stop() when user aborts during countdown
+  finishCountin();
+}
+
 // --- Init ---
 
 function init() {
@@ -1386,6 +1605,10 @@ function init() {
   if (Number.isFinite(storedBt)) state.btLatencyMs = storedBt;
   const storedAuto = localStorage.getItem(BT_AUTO_KEY);
   if (storedAuto !== null) state.autoBtLatency = storedAuto === '1';
+
+  // Apply persisted theme (the inline <head> script already set data-theme to
+  // avoid flash; this syncs the meta tag and the picker's active state).
+  applyTheme(loadTheme());
 
   bind();
 
