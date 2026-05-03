@@ -1463,22 +1463,25 @@ details > *:last-child { padding-bottom: 16px; }
 }
 
 .beat-indicator--big {
-  gap: clamp(10px, 2.5vmin, 24px);
+  gap: clamp(12px, 2vmax, 32px);
   flex-wrap: nowrap;
 }
 
 .beat-indicator--big .beat-stack {
-  /* vmin so the size is consistent regardless of orientation/rotation */
-  width: clamp(80px, 14vmin, 220px);
-  height: clamp(260px, 70vmin, 540px);
-  gap: clamp(12px, 2.5vmin, 26px);
-  padding: clamp(16px, 3vmin, 28px) 0;
-  border-radius: clamp(16px, 2.5vmin, 28px);
+  /* Width tracks the LONG axis (vmax) so stacks fill the wide edges;
+     height tracks the SHORT axis (vmin) so they fit between the safe
+     paddings. Works the same in native landscape and CSS-rotated portrait
+     (since vmin/vmax always reference the actual viewport). */
+  width: clamp(110px, 17vmax, 280px);
+  height: clamp(280px, 88vmin, 540px);
+  gap: clamp(14px, 3.5vmin, 32px);
+  padding: clamp(18px, 3.5vmin, 32px) 0;
+  border-radius: clamp(18px, 3vmin, 32px);
 }
 
 .beat-indicator--big .beat-stack .bdot {
-  width: clamp(14px, 3vmin, 30px);
-  height: clamp(14px, 3vmin, 30px);
+  width: clamp(16px, 3.5vmin, 36px);
+  height: clamp(16px, 3.5vmin, 36px);
 }
 
 .flash-controls {
@@ -1536,8 +1539,12 @@ details > *:last-child { padding-bottom: 16px; }
 
 .flash-overlay.flash-pulse-full { animation: flashPulseFull 0.18s ease-out; }
 .flash-overlay.flash-pulse-half { animation: flashPulseHalf 0.18s ease-out; }
-@keyframes flashPulseFull { 0% { opacity: 0.5; } 100% { opacity: 0; } }
-@keyframes flashPulseHalf { 0% { opacity: 0.28; } 100% { opacity: 0; } }
+/* Pure accent at peak so the flash reads as full lime rather than a
+   tinted overlay. Fast 180ms fade keeps the rapid-flash exposure low
+   enough to remain below WCAG photosensitivity thresholds even at high
+   BPM, but the warning modal still gates first activation. */
+@keyframes flashPulseFull { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes flashPulseHalf { 0% { opacity: 0.6; } 100% { opacity: 0; } }
 
 /* Portrait phone — pre-rotate the fullscreen content 90° clockwise so the
    user only has to physically turn the phone 90° left to read it upright.
@@ -1562,6 +1569,17 @@ details > *:last-child { padding-bottom: 16px; }
       max(16px, env(safe-area-inset-bottom))
       max(16px, env(safe-area-inset-left))
       max(16px, env(safe-area-inset-top));
+  }
+
+  /* Same rotation for the epilepsy-warning modal (triggered FROM inside
+     the rotated fullscreen). Keeps the dialog upright when the user
+     rotates the phone, and "matches" the rotated content while they're
+     still in portrait. */
+  #flash-warning-modal.open {
+    width: 100dvh;
+    height: 100dvw;
+    transform: rotate(90deg);
+    transform-origin: 50dvmin 50dvmin;
   }
 }
 
