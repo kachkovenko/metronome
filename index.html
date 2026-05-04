@@ -101,20 +101,23 @@
           <div id="beat-indicator" class="beat-indicator"></div>
         </section>
 
-        <div class="play-row">
-          <button id="countin-btn" class="countin-btn" aria-label="Отложенный старт">
-            <span class="countin-btn-content">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="9"/>
-                <polyline points="12 7 12 12 15 14"/>
-              </svg>
-              <span class="countin-btn-num" id="countin-btn-num"></span>
-            </span>
-          </button>
-          <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
-            <span class="play-icon">▶</span>
-            <span class="play-text">СТАРТ</span>
-          </button>
+        <div class="play-stack">
+          <div class="play-row">
+            <button id="countin-btn" class="countin-btn" aria-label="Отложенный старт">
+              <span class="countin-btn-content">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9"/>
+                  <polyline points="12 7 12 12 15 14"/>
+                </svg>
+                <span class="countin-btn-num" id="countin-btn-num"></span>
+              </span>
+            </button>
+            <button id="play-btn" class="play-btn" aria-label="Старт/Стоп">
+              <span class="play-icon">▶</span>
+              <span class="play-text">СТАРТ</span>
+            </button>
+          </div>
+          <div id="active-trainers" class="active-trainers"></div>
         </div>
 
         <div id="mic-live" class="mic-live" hidden>

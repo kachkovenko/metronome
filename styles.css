@@ -80,12 +80,11 @@ button, input, select, textarea {
    right at the button's edge). */
 #tab-metronome { padding-bottom: 8px; }
 #tab-metronome > * { flex-shrink: 0; }
-/* Both auto margins so the play-row sits in the middle of the remaining
-   vertical space — equal gap above (between beat-card and play-row) and
-   below (between play-row and the tab-bar / mic-live). Adapts to screen
-   height automatically: tall phones get more breathing room, short ones
-   collapse the gap until elements touch. */
-#tab-metronome > .play-row { margin-top: auto; margin-bottom: auto; }
+/* Both auto margins so the play-stack (Start row + active-trainer tags)
+   sits in the middle of the remaining vertical space — equal gap above
+   and below the entire group. Adapts to screen height automatically:
+   tall phones get more breathing room, short ones collapse the gap. */
+#tab-metronome > .play-stack { margin-top: auto; margin-bottom: auto; }
 
 /* Training & Settings tabs: scroll inside the tab area */
 #tab-training,
@@ -495,6 +494,57 @@ button, input, select, textarea {
 .beat-stack.active[data-type="accent"] .bdot {
   box-shadow: 0 0 10px rgba(213, 255, 60, 0.7);
 }
+
+/* play-stack wraps the Start row plus the active-trainer tag list so
+   they're centered together by the auto margins on #tab-metronome. */
+.play-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Active trainer tags — one pill per enabled trainer, with a × to
+   disable. Hidden when none are active. Centered horizontally; wraps
+   if multiple trainers are on at once. */
+.active-trainers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.active-trainers:empty { display: none; }
+
+.trainer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 14px;
+  background: var(--card);
+  color: var(--fg);
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.trainer-tag-close {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-family: inherit;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.06s ease;
+}
+
+.trainer-tag-close:hover { color: var(--fg); }
+.trainer-tag-close:active { transform: scale(0.92); background: var(--card-3); }
+.trainer-tag-close svg { width: 12px; height: 12px; }
 
 /* Play row — count-in pill sits BEHIND the main Start pill (same shape,
    only the leftmost ~--play-h is visible). Both share grid-area "row"

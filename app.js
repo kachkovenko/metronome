@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.15.0';
 
 const state = {
   bpm: 100,
@@ -921,14 +921,20 @@ function bind() {
   });
 
   // Trainer
-  $('trainer-on').addEventListener('change', e => state.trainerEnabled = e.target.checked);
+  $('trainer-on').addEventListener('change', e => {
+    state.trainerEnabled = e.target.checked;
+    renderActiveTrainers();
+  });
   $('trainer-start').addEventListener('change', e => state.trainerStart = Number(e.target.value));
   $('trainer-end').addEventListener('change', e => state.trainerEnd = Number(e.target.value));
   $('trainer-step').addEventListener('change', e => state.trainerStep = Number(e.target.value));
   $('trainer-bars').addEventListener('change', e => state.trainerBars = Number(e.target.value));
 
   // Mute
-  $('mute-on').addEventListener('change', e => state.muteEnabled = e.target.checked);
+  $('mute-on').addEventListener('change', e => {
+    state.muteEnabled = e.target.checked;
+    renderActiveTrainers();
+  });
   $('mute-pct').addEventListener('input', e => {
     state.mutePct = Number(e.target.value);
     $('mute-pct-out').value = state.mutePct;
@@ -941,11 +947,17 @@ function bind() {
         e.target.checked = false;
         setMicStatus('Останови метроном перед включением — нужно прогнать тестовый клик и проверить, не идёт ли звук через динамик.');
         showToast('Сначала останови метроном');
+        renderActiveTrainers();
         return;
       }
+      renderActiveTrainers();
       await startMic();
+      // startMic may have aborted (no headphones / permission denied);
+      // re-render to drop the tag if the checkbox flipped back.
+      renderActiveTrainers();
     } else {
       stopMic();
+      renderActiveTrainers();
     }
   });
 
@@ -1076,6 +1088,43 @@ function setupVersionAndUpdate() {
       updateBtn.disabled = false;
     });
   });
+}
+
+// --- Active trainer tags ---
+//
+// One pill per enabled trainer rendered under the Start button. Click ×
+// flips the corresponding checkbox to off and dispatches `change` so the
+// existing handler tears the trainer down (stopMic / state flags / etc.).
+const TRAINER_DEFS = [
+  { checkboxId: 'mic-on',     label: 'Тренажёр ритма' },
+  { checkboxId: 'trainer-on', label: 'Speed Trainer' },
+  { checkboxId: 'mute-on',    label: 'Случайные пропуски' },
+];
+
+function renderActiveTrainers() {
+  const root = $('active-trainers');
+  if (!root) return;
+  root.innerHTML = '';
+  for (const def of TRAINER_DEFS) {
+    const cb = $(def.checkboxId);
+    if (!cb || !cb.checked) continue;
+    const tag = document.createElement('div');
+    tag.className = 'trainer-tag';
+    tag.innerHTML = `
+      <span>${def.label}</span>
+      <button class="trainer-tag-close" aria-label="Выключить ${def.label}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/>
+          <line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+    `;
+    tag.querySelector('button').addEventListener('click', () => {
+      cb.checked = false;
+      cb.dispatchEvent(new Event('change'));
+    });
+    root.appendChild(tag);
+  }
 }
 
 // --- Microphone timing trainer (Stage 1 MVP) ---
