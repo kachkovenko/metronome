@@ -191,15 +191,20 @@
           </details>
 
           <details>
-            <summary>Случайные пропуски</summary>
-            <p class="muted small">Случайно «выключает» доли — заставляет считать внутри.</p>
+            <summary>Пропуск тактов</summary>
+            <p class="muted small">Метроном замолкает на M тактов после N сыгранных. Развивает внутренний счёт: между «слышимыми» отрезками держишь темп сам, и при возвращении клика проверяешь, не уехал ли.</p>
             <label class="toggle">
               <input id="mute-on" type="checkbox">
               <span>Включить</span>
             </label>
-            <label class="vol">Вероятность пропуска <output id="mute-pct-out">20</output>%
-              <input id="mute-pct" type="range" min="0" max="80" value="20">
-            </label>
+            <div class="grid2">
+              <label>Играть тактов
+                <input id="mute-play-bars" type="number" min="1" max="32" value="2">
+              </label>
+              <label>Пропускать тактов
+                <input id="mute-skip-bars" type="number" min="1" max="32" value="1">
+              </label>
+            </div>
           </details>
         </div>
       </section>

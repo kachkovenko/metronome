@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.16.0';
 
 const state = {
   bpm: 100,
@@ -27,7 +27,9 @@ const state = {
   trainerBarCount: 0,
 
   muteEnabled: false,
-  mutePct: 20,
+  mutePlayBars: 2,
+  muteSkipBars: 1,
+  muteBarCount: 0,
 
   // Identifier of the currently-applied preset, or null. Format: "builtin:N" / "user:N".
   // Cleared when the user touches the metronome and the new state diverges from the preset
@@ -183,10 +185,17 @@ function playClick(type, time) {
 function scheduleNote(beat, sub, time) {
   notesInQueue.push({ beat, sub, time });
 
+  // Bar-pattern mute: silence the entire bar (beats + subs) on the
+  // skip-portion of each play/skip cycle. muteBarCount advances at bar
+  // boundaries in advance().
+  if (state.muteEnabled) {
+    const total = state.mutePlayBars + state.muteSkipBars;
+    if (total > 0 && state.muteBarCount % total >= state.mutePlayBars) return;
+  }
+
   if (sub === 0) {
     const beatType = state.beatTypes[beat] || 'beat';
     if (beatType === 'mute') return;
-    if (state.muteEnabled && Math.random() * 100 < state.mutePct) return;
     playClick(beatType, time);
   } else {
     playClick('sub', time);
@@ -203,6 +212,7 @@ function advance() {
     state.currentBeat++;
     if (state.currentBeat >= state.beatsPerMeasure) {
       state.currentBeat = 0;
+      state.muteBarCount++;
       if (state.trainerEnabled) {
         state.trainerBarCount++;
         if (state.trainerBarCount >= state.trainerBars) {
@@ -235,6 +245,7 @@ async function start() {
   state.currentBeat = 0;
   state.currentSub = 0;
   state.trainerBarCount = 0;
+  state.muteBarCount = 0;
   // Count-in: just push the first scheduled note out by countinSec seconds
   // so the metronome stays silent during the countdown. Scheduler runs
   // normally — it just won't queue anything until we get within the
@@ -930,14 +941,18 @@ function bind() {
   $('trainer-step').addEventListener('change', e => state.trainerStep = Number(e.target.value));
   $('trainer-bars').addEventListener('change', e => state.trainerBars = Number(e.target.value));
 
-  // Mute
+  // Mute (bar-pattern: play N bars, skip M bars, repeat)
   $('mute-on').addEventListener('change', e => {
     state.muteEnabled = e.target.checked;
     renderActiveTrainers();
   });
-  $('mute-pct').addEventListener('input', e => {
-    state.mutePct = Number(e.target.value);
-    $('mute-pct-out').value = state.mutePct;
+  $('mute-play-bars').addEventListener('change', e => {
+    state.mutePlayBars = Math.max(1, Number(e.target.value) || 1);
+    e.target.value = state.mutePlayBars;
+  });
+  $('mute-skip-bars').addEventListener('change', e => {
+    state.muteSkipBars = Math.max(1, Number(e.target.value) || 1);
+    e.target.value = state.muteSkipBars;
   });
 
   // Mic timing trainer
@@ -1098,7 +1113,7 @@ function setupVersionAndUpdate() {
 const TRAINER_DEFS = [
   { checkboxId: 'mic-on',     label: 'Тренажёр ритма' },
   { checkboxId: 'trainer-on', label: 'Speed Trainer' },
-  { checkboxId: 'mute-on',    label: 'Случайные пропуски' },
+  { checkboxId: 'mute-on',    label: 'Пропуск тактов' },
 ];
 
 function renderActiveTrainers() {
