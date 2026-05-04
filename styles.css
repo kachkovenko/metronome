@@ -74,7 +74,12 @@ button, input, select, textarea {
 /* Метроном tab: keep no-scroll behavior, play button anchors to bottom */
 #tab-metronome { overflow: hidden; padding-bottom: 8px; }
 #tab-metronome > * { flex-shrink: 0; }
-#tab-metronome > .play-row { margin-top: auto; }
+/* Both auto margins so the play-row sits in the middle of the remaining
+   vertical space — equal gap above (between beat-card and play-row) and
+   below (between play-row and the tab-bar / mic-live). Adapts to screen
+   height automatically: tall phones get more breathing room, short ones
+   collapse the gap until elements touch. */
+#tab-metronome > .play-row { margin-top: auto; margin-bottom: auto; }
 
 /* Training & Settings tabs: scroll inside the tab area */
 #tab-training,

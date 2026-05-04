@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.10.1';
+const APP_VERSION = '1.10.2';
 
 const state = {
   bpm: 100,
