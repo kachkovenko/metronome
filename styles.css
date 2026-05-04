@@ -188,24 +188,26 @@ button, input, select, textarea {
   flex-direction: column;
   gap: 12px;
   /* overflow:hidden so the easter-egg image is clipped by the card's
-     rounded corners as it slides in/out from the right. */
+     rounded corners. */
   overflow: hidden;
 }
 
-/* Easter egg — slides in from behind the card's right edge as the wheel
-   is scrolled past BPM 300. Top-anchored with height 60% so the bottom
-   of the image roughly aligns with the bottom of the BPM wheel — covers
-   the BPM number + corner icons but stays out of the +/- buttons and
-   TAP TEMPO. JS sets transform: translateX(...) per scroll position. */
+/* Easter egg — fades in over the BPM/wheel area as the wheel scrolls
+   from 300 to 320 BPM (opacity 0→1). Position is fixed within the card,
+   never moves. Top-anchored with height 60% so the bottom of the image
+   roughly aligns with the bottom of the BPM wheel — covers the BPM
+   number + corner icons but stays out of the +/- buttons and TAP TEMPO.
+   pointer-events: none lets the wheel be dragged through the image.
+   z-index above icon buttons so the image visually sits on top. */
 .bpm-easter {
   position: absolute;
   top: 0;
   right: 0;
   height: 60%;
   width: auto;
-  transform: translateX(100%);
+  opacity: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 5;
   user-select: none;
   -webkit-user-drag: none;
   border-radius: var(--radius-sm);
@@ -313,9 +315,9 @@ button, input, select, textarea {
   border-radius: 1px;
 }
 
-/* Empty scroll runway after the last tick — width set inline in JS
-   (matches EASTER_RUNWAY_PX). Real DOM child so Safari counts it
-   into scrollWidth. */
+/* Trailing scroll spacer (= halfW) so the last BPM tick can reach center
+   on Safari, where padding-right on a flex scroll container is not always
+   counted into scrollWidth. Real DOM child, width set inline in JS. */
 .wheel-spacer { height: 1px; pointer-events: none; }
 
 .wheel-center {

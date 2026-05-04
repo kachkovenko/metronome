@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.12.2';
+const APP_VERSION = '1.13.1';
 
 const state = {
   bpm: 100,
@@ -353,12 +353,11 @@ function cycleBeat(i) {
 // --- BPM wheel ---
 
 const BPM_MIN = 30;
-const BPM_MAX = 300;
+const BPM_MAX = 320;
 const TICK_PX = 10;  // tick (2px) + gap (8px) per BPM step
-// Extra scrollable runway past the BPM_MAX tick where the easter-egg
-// image lives. Scrolling further into this zone reveals more of the
-// image (translateX from 100% to 0%) but doesn't change state.bpm.
-const EASTER_RUNWAY_PX = 220;
+// Easter-egg image fades in over the 300→320 BPM range (opacity 0→1).
+// Image is positioned absolutely over the BPM/wheel area and never moves.
+const EASTER_START_BPM = 300;
 let suppressWheelScroll = false;
 
 function buildBpmWheel() {
@@ -370,16 +369,14 @@ function buildBpmWheel() {
     tick.dataset.bpm = bpm;
     track.appendChild(tick);
   }
-  // Real DOM spacer for the easter runway — Safari's scroll containers
-  // don't always extend scrollWidth via padding-right on a flex track,
-  // but a real flex child is always counted. Set width + min-width +
-  // flex-basis explicitly: Safari has been observed to ignore one or
-  // the other for empty flex children, so we send all three.
+  // Trailing flex spacer so the last tick can reach the wheel's center.
+  // Safari's flex scroll containers don't always count padding-right into
+  // scrollWidth, but a real flex child with explicit width is. Width is
+  // set in applyWheelPadding (= halfW). All three sizing properties are
+  // sent because Safari has been observed to ignore one or the other for
+  // empty flex children.
   const spacer = document.createElement('div');
   spacer.className = 'wheel-spacer';
-  spacer.style.width = `${EASTER_RUNWAY_PX}px`;
-  spacer.style.minWidth = `${EASTER_RUNWAY_PX}px`;
-  spacer.style.flex = `0 0 ${EASTER_RUNWAY_PX}px`;
   track.appendChild(spacer);
   applyWheelPadding();
   scrollWheelToBpm(state.bpm, false);
@@ -389,25 +386,29 @@ function applyWheelPadding() {
   const wheel = $('bpm-wheel');
   const track = $('wheel-track');
   const halfW = wheel.clientWidth / 2;
-  // Both sides halfW so the first/last BPM tick can reach the center.
-  // Easter runway comes from the .wheel-spacer flex child.
+  // padding-left so the first tick can reach the center; the trailing
+  // edge uses a flex spacer instead of padding-right (see buildBpmWheel).
   track.style.paddingLeft = halfW + 'px';
-  track.style.paddingRight = halfW + 'px';
+  track.style.paddingRight = '0';
+  const spacer = track.querySelector('.wheel-spacer');
+  if (spacer) {
+    spacer.style.width = `${halfW}px`;
+    spacer.style.minWidth = `${halfW}px`;
+    spacer.style.flex = `0 0 ${halfW}px`;
+  }
 }
 
 function easterProgress() {
-  const wheel = $('bpm-wheel');
-  if (!wheel) return 0;
-  const maxBpmScroll = (BPM_MAX - BPM_MIN) * TICK_PX;
-  const overscroll = wheel.scrollLeft - maxBpmScroll;
-  return Math.max(0, Math.min(1, overscroll / EASTER_RUNWAY_PX));
+  // Fade Arnold in over the 300→320 BPM range based on state.bpm.
+  const range = BPM_MAX - EASTER_START_BPM;
+  if (range <= 0) return 0;
+  return Math.max(0, Math.min(1, (state.bpm - EASTER_START_BPM) / range));
 }
 
 function updateEaster() {
   const easter = $('bpm-easter');
   if (!easter) return;
-  const p = easterProgress();
-  easter.style.transform = `translateX(${(1 - p) * 100}%)`;
+  easter.style.opacity = String(easterProgress());
 }
 
 function scrollWheelToBpm(bpm, smooth = true) {
@@ -436,29 +437,11 @@ function onWheelScroll() {
     wheel.setAttribute('aria-valuenow', String(bpm));
     playWheelTick();
   }
-  // Easter follows scrollLeft continuously, even past BPM_MAX where
-  // bpm doesn't change anymore.
   updateEaster();
-  // After scroll settles: in BPM zone, snap to nearest tick. In easter
-  // zone, snap binary — past halfway = full Arnold reveal, before
-  // halfway = back to BPM 300 tick. Without this, iOS momentum dies at
-  // an arbitrary midpoint and the user can't reliably "lock in" the
-  // full reveal (the springy intermediate state).
+  // After scroll settles, snap scrollLeft to the nearest BPM tick.
   clearTimeout(scrollEndTimer);
   scrollEndTimer = setTimeout(() => {
     if (suppressWheelScroll) return;
-    const maxBpmScroll = (BPM_MAX - BPM_MIN) * TICK_PX;
-    if (wheel.scrollLeft > maxBpmScroll) {
-      const fullReveal = maxBpmScroll + EASTER_RUNWAY_PX;
-      const halfway = maxBpmScroll + EASTER_RUNWAY_PX / 2;
-      const target = wheel.scrollLeft >= halfway ? fullReveal : maxBpmScroll;
-      if (Math.abs(wheel.scrollLeft - target) > 1) {
-        suppressWheelScroll = true;
-        wheel.scrollTo({ left: target, behavior: 'smooth' });
-        setTimeout(() => { suppressWheelScroll = false; }, 350);
-      }
-      return;
-    }
     const targetLeft = (state.bpm - BPM_MIN) * TICK_PX;
     if (Math.abs(wheel.scrollLeft - targetLeft) > 1) {
       scrollWheelToBpm(state.bpm, true);
@@ -477,6 +460,7 @@ function setBpm(v) {
     wheel.setAttribute('aria-valuenow', String(v));
     scrollWheelToBpm(v, true);
   }
+  updateEaster();
 }
 
 // --- Wheel tick (haptic + soft click on BPM scroll) ---
