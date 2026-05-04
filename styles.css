@@ -1129,9 +1129,19 @@ details > *:last-child { padding-bottom: 16px; }
 
 /* Program preview sheet */
 .program-preview-meta {
-  margin: -8px 0 14px;
+  margin: -8px 0 8px;
   font-size: 13px;
   color: var(--muted);
+}
+
+.program-preview-description {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--card-2);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fg);
 }
 
 .program-preview-blocks {

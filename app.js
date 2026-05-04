@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.17.1';
 
 const state = {
   bpm: 100,
@@ -160,6 +160,7 @@ const PROGRAMS = [
   },
   {
     id: 'beginner-30', name: 'Начинающий · 30 мин', difficulty: 'beginner', duration: 30,
+    description: 'Обе песни идут на одном базовом рок-битe — это тренировка удержания грува при росте темпа: ≈87 → ≈124 BPM.',
     blocks: [
       { type: 'warmup', title: 'Разминка · одиночные', duration: 120,
         bpm: 60, sig: { num: 4, den: 4 }, sub: 2,
@@ -206,6 +207,7 @@ const PROGRAMS = [
   },
   {
     id: 'beginner-60', name: 'Начинающий · 60 мин', difficulty: 'beginner', duration: 60,
+    description: 'Все три песни идут на одном базовом рок-битe — фокус на удержании грува при росте темпа: ≈87 → ≈110 → ≈124 BPM.',
     blocks: [
       { type: 'warmup', title: 'Разминка · одиночные', duration: 180,
         bpm: 60, sig: { num: 4, den: 4 }, sub: 2,
@@ -263,7 +265,7 @@ const PROGRAMS = [
         exercise: { kind: 'groove',
           grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
           reference: 'В стиле Seven Nation Army (The White Stripes) · ≈ 124 BPM',
-          notes: 'Целевой темп — 124. Жёсткий бэкбит на снейре.' } },
+          notes: 'Тот же рисунок, целевой темп — 124. Жёсткий бэкбит на снейре, сохраняй ровность.' } },
       { type: 'cooldown', title: 'Заминка', duration: 300,
         bpm: 80, sig: { num: 4, den: 4 }, sub: 1,
         exercise: { kind: 'free', notes: 'Свободная игра под любимую музыку. Без метронома, если хочешь.' } },
@@ -2020,6 +2022,9 @@ function openProgramPreview(id) {
   $('program-preview-title').textContent = p.name;
   const totalMin = Math.round(totalProgramSeconds(p) / 60);
   $('program-preview-meta').textContent = `${p.blocks.length} блоков · итого ≈ ${totalMin} мин`;
+  const desc = $('program-preview-description');
+  desc.textContent = p.description || '';
+  desc.hidden = !p.description;
   const list = $('program-preview-blocks');
   list.innerHTML = '';
   p.blocks.forEach(block => {
