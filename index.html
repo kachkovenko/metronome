@@ -376,10 +376,6 @@
 
   <!-- Fullscreen flash view -->
   <div id="flash-screen" class="flash-screen" aria-hidden="true">
-    <!-- overlays sit BEHIND the grid items (z-index 1) so stacks stay readable while flashing -->
-    <div class="flash-overlay flash-overlay-full" id="flash-overlay-full"></div>
-    <div class="flash-overlay flash-overlay-half" id="flash-overlay-half"></div>
-
     <div class="flash-info">
       <div class="flash-info-item">
         <span class="flash-info-label">BPM</span>
@@ -449,25 +445,6 @@
       <p class="muted">Скоро (в течение 3-5 дней) тут появится много интересного.</p>
       <div class="warning-actions training-actions">
         <button class="warning-ok" id="training-ok">Буду знать</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Epilepsy warning before enabling lamp/flash mode -->
-  <div id="flash-warning-modal" class="modal" aria-hidden="true">
-    <div class="modal-backdrop" data-close></div>
-    <div class="sheet">
-      <div class="sheet-handle"></div>
-      <h3>Внимание: вспышки экрана</h3>
-      <p class="muted">Полноэкранные вспышки на высоких BPM могут вызывать дискомфорт у людей с фоточувствительной эпилепсией. Если у тебя или рядом есть такие — лучше пропустить.</p>
-      <p class="muted small">Используется только акцент на полную площадь, остальные доли — на верхней половине с пониженным контрастом и плавным затуханием.</p>
-      <label class="toggle">
-        <input id="flash-warning-skip" type="checkbox">
-        <span>Больше не показывать</span>
-      </label>
-      <div class="warning-actions">
-        <button class="warning-cancel" id="flash-warning-cancel">Отмена</button>
-        <button class="warning-ok" id="flash-warning-ok">Включить</button>
       </div>
     </div>
   </div>

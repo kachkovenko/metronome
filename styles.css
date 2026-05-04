@@ -1565,26 +1565,16 @@ details > *:last-child { padding-bottom: 16px; }
 }
 .flash-play-btn.playing .flash-play-icon { margin-left: 0; }
 
-/* Lime overlays — z-index 1 so they sit BEHIND the grid columns (info / stacks /
-   controls) which are z-index 2. Stacks remain readable while screen pulses. */
-.flash-overlay {
-  position: absolute;
-  pointer-events: none;
-  background: var(--accent);
-  opacity: 0;
-  z-index: 1;
+/* Lamp mode (toggled by the bulb button in fullscreen) — instead of
+   flashing the whole screen, we just paint the ACTIVE stack background
+   at full brightness so each beat reads from across the room. No
+   photosensitivity risk, so the warning modal is gone. */
+.flash-screen.lamp-on .beat-stack.active {
+  background: var(--fg);
 }
-.flash-overlay-full { inset: 0; }
-.flash-overlay-half { top: 0; left: 0; right: 0; height: 50%; }
-
-.flash-overlay.flash-pulse-full { animation: flashPulseFull 0.18s ease-out; }
-.flash-overlay.flash-pulse-half { animation: flashPulseHalf 0.18s ease-out; }
-/* Pure accent at peak so the flash reads as full lime rather than a
-   tinted overlay. Fast 180ms fade keeps the rapid-flash exposure low
-   enough to remain below WCAG photosensitivity thresholds even at high
-   BPM, but the warning modal still gates first activation. */
-@keyframes flashPulseFull { 0% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes flashPulseHalf { 0% { opacity: 0.6; } 100% { opacity: 0; } }
+.flash-screen.lamp-on .beat-stack.active[data-type="accent"] {
+  background: var(--accent);
+}
 
 /* Portrait phone — pre-rotate the fullscreen content 90° clockwise so the
    user only has to physically turn the phone 90° left to read it upright.
@@ -1611,16 +1601,6 @@ details > *:last-child { padding-bottom: 16px; }
       max(16px, env(safe-area-inset-top));
   }
 
-  /* Same rotation for the epilepsy-warning modal (triggered FROM inside
-     the rotated fullscreen). Keeps the dialog upright when the user
-     rotates the phone, and "matches" the rotated content while they're
-     still in portrait. */
-  #flash-warning-modal.open {
-    width: 100dvh;
-    height: 100dvw;
-    transform: rotate(90deg);
-    transform-origin: 50dvmin 50dvmin;
-  }
 }
 
 /* === Count-in popup options === */
@@ -1709,15 +1689,8 @@ details > *:last-child { padding-bottom: 16px; }
   cursor: pointer;
 }
 
-.warning-cancel { background: var(--card-2); color: var(--fg); }
 .warning-ok { background: var(--accent); color: #000; }
-.warning-cancel:active,
 .warning-ok:active { transform: scale(0.98); }
-
-/* The flash-warning modal is triggered FROM inside fullscreen, so it must
-   layer above .flash-screen (z-index 120). Other modals stay at 110 — they
-   only open from the main view, which is hidden behind fullscreen anyway. */
-#flash-warning-modal { z-index: 140; }
 
 /* Single-button variant of warning-actions (one CTA spans the row) */
 .training-actions { grid-template-columns: 1fr; }

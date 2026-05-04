@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 
 const state = {
   bpm: 100,
@@ -59,7 +59,6 @@ const BT_LATENCY_KEY = 'metronome.bt-latency-ms';
 const BT_AUTO_KEY = 'metronome.bt-auto';
 const INPUT_LATENCY_KEY = 'metronome.input-latency-ms';
 const THEME_KEY = 'metronome.theme';
-const FLASH_WARNING_KEY = 'metronome.flash-warning-acked';
 
 const THEME_COLORS = { dark: '#000000', light: '#f5f5f7' };
 
@@ -274,10 +273,11 @@ function highlightBeat(beat) {
   // Match by data-beat (not by NodeList index): with a second indicator in
   // the fullscreen view, both share the same beat numbers but live in
   // different parents. Multiple .beat-stack[data-beat="0"] should all light up.
+  // Lamp mode (when on) is handled purely in CSS via .lamp-on on the
+  // fullscreen container — no JS coordination needed here.
   document.querySelectorAll('.beat-stack').forEach(s => {
     s.classList.toggle('active', Number(s.dataset.beat) === beat);
   });
-  if (state.flashEnabled) triggerFlash(beat);
 }
 
 function clearBeatIndicator() {
@@ -744,21 +744,11 @@ function bind() {
   // Fullscreen flash view
   $('fullscreen-btn').addEventListener('click', openFlashScreen);
   $('flash-close').addEventListener('click', closeFlashScreen);
-  $('flash-lamp').addEventListener('click', tryToggleLamp);
+  $('flash-lamp').addEventListener('click', toggleLamp);
   $('flash-play').addEventListener('click', toggle);
 
   // Training tab placeholder
   $('training-ok').addEventListener('click', () => closeModal('training-modal'));
-
-  // Epilepsy warning modal
-  $('flash-warning-cancel').addEventListener('click', () => closeModal('flash-warning-modal'));
-  $('flash-warning-ok').addEventListener('click', () => {
-    if ($('flash-warning-skip').checked) {
-      try { localStorage.setItem(FLASH_WARNING_KEY, '1'); } catch {}
-    }
-    closeModal('flash-warning-modal');
-    setFlashMode(true);
-  });
 
   // Count-in (delayed start) — picking arms; the countdown itself fires
   // from start() when the user presses the main Start button.
@@ -875,7 +865,6 @@ function bind() {
       closeModal('time-modal');
       closeModal('presets-modal');
       closeModal('countin-modal');
-      closeModal('flash-warning-modal');
       closeModal('training-modal');
       if ($('flash-screen').classList.contains('open')) closeFlashScreen();
     }
@@ -1522,33 +1511,11 @@ function setFlashMode(on) {
   state.flashEnabled = !!on;
   const lamp = $('flash-lamp');
   if (lamp) lamp.setAttribute('aria-pressed', state.flashEnabled ? 'true' : 'false');
+  const screen = $('flash-screen');
+  if (screen) screen.classList.toggle('lamp-on', state.flashEnabled);
 }
 
-function tryToggleLamp() {
-  if (state.flashEnabled) { setFlashMode(false); return; }
-  // First-time activation — show epilepsy warning unless previously acked
-  let acked = false;
-  try { acked = localStorage.getItem(FLASH_WARNING_KEY) === '1'; } catch {}
-  if (acked) { setFlashMode(true); return; }
-  openModal('flash-warning-modal');
-}
-
-// Fired from highlightBeat() when state.flashEnabled is true.
-// Mitigations per WCAG 2.3.1: low peak opacity, fast fade, accent gets
-// full screen but it's the rarer beat; non-accent gets only top half with
-// even lower contrast.
-function triggerFlash(beat) {
-  const beatType = state.beatTypes[beat] || 'beat';
-  if (beatType === 'mute') return;
-  const isAccent = beatType === 'accent';
-  const overlay = isAccent ? $('flash-overlay-full') : $('flash-overlay-half');
-  if (!overlay) return;
-  const cls = isAccent ? 'flash-pulse-full' : 'flash-pulse-half';
-  // Restart animation by toggling class
-  overlay.classList.remove(cls);
-  void overlay.offsetWidth;
-  overlay.classList.add(cls);
-}
+function toggleLamp() { setFlashMode(!state.flashEnabled); }
 
 // --- Count-in (delayed start) ---
 
