@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.16.1';
 
 const state = {
   bpm: 100,
@@ -1137,6 +1137,9 @@ function renderActiveTrainers() {
     tag.querySelector('button').addEventListener('click', () => {
       cb.checked = false;
       cb.dispatchEvent(new Event('change'));
+      // Stop the metronome too — leaving a trainer mode usually means
+      // ending the practice session, so playing on would be surprising.
+      if (state.isPlaying) stop();
     });
     root.appendChild(tag);
   }
