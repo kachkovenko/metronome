@@ -110,7 +110,7 @@ const BUILTIN_PRESETS = [
   { name: '6/8 (90)', bpm: 90, num: 6, den: 8, sub: 1 },
 ];
 
-// --- Programs (training routines) ---
+// --- Program data + labels ---
 //
 // A program is an ordered list of blocks. Each block:
 //   type:        'warmup'|'rudiment'|'coordination'|'song'|'cooldown' (for icon/label)
@@ -1289,7 +1289,7 @@ function bind() {
   $('flash-lamp').addEventListener('click', toggleLamp);
   $('flash-play').addEventListener('click', toggle);
 
-  // Programs (training routines)
+  // Programs
   $('program-create').addEventListener('click', () => showToast('Эта функция пока не работает'));
   $('program-import').addEventListener('click', () => showToast('Эта функция пока не работает'));
   $('program-start').addEventListener('click', () => {
@@ -1948,7 +1948,7 @@ function finishCountin() {
 
 function cancelCountin() { finishCountin(); }
 
-// --- Programs (training routines) ---
+// --- Programs runtime (state, UI, lifecycle) ---
 //
 // A program is an ordered list of blocks. The runner pushes each block's
 // settings into the metronome (BPM/sig/sub + optional Speed Trainer ramp)
