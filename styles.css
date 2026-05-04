@@ -1592,6 +1592,13 @@ details > *:last-child { padding-bottom: 16px; }
   background: var(--accent);
 }
 
+/* Recolor the dots when the bg is bright — otherwise they vanish
+   (lime dots on lime bg, white dots on white bg). On the lime-accent
+   active bg use pure black; on the white/--fg active bg use --bg
+   (black in dark theme, light gray in light theme — both contrasty). */
+.flash-screen.lamp-on .beat-stack.active .bdot { background: var(--bg); }
+.flash-screen.lamp-on .beat-stack.active[data-type="accent"] .bdot { background: #000; }
+
 /* Portrait phone — pre-rotate the fullscreen content 90° clockwise so the
    user only has to physically turn the phone 90° left to read it upright.
    When the phone is actually held in landscape (orientation: landscape),
