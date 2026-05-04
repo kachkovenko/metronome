@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 
 const state = {
   bpm: 100,
@@ -355,6 +355,10 @@ function cycleBeat(i) {
 const BPM_MIN = 30;
 const BPM_MAX = 300;
 const TICK_PX = 10;  // tick (2px) + gap (8px) per BPM step
+// Extra scrollable runway past the BPM_MAX tick where the easter-egg
+// image lives. Scrolling further into this zone reveals more of the
+// image (translateX from 100% to 0%) but doesn't change state.bpm.
+const EASTER_RUNWAY_PX = 220;
 let suppressWheelScroll = false;
 
 function buildBpmWheel() {
@@ -375,7 +379,24 @@ function applyWheelPadding() {
   const track = $('wheel-track');
   const halfW = wheel.clientWidth / 2;
   track.style.paddingLeft = halfW + 'px';
-  track.style.paddingRight = halfW + 'px';
+  // halfW lets the BPM_MAX tick reach center; +EASTER_RUNWAY_PX adds
+  // empty scrollable space beyond that for the easter reveal.
+  track.style.paddingRight = (halfW + EASTER_RUNWAY_PX) + 'px';
+}
+
+function easterProgress() {
+  const wheel = $('bpm-wheel');
+  if (!wheel) return 0;
+  const maxBpmScroll = (BPM_MAX - BPM_MIN) * TICK_PX;
+  const overscroll = wheel.scrollLeft - maxBpmScroll;
+  return Math.max(0, Math.min(1, overscroll / EASTER_RUNWAY_PX));
+}
+
+function updateEaster() {
+  const easter = $('bpm-easter');
+  if (!easter) return;
+  const p = easterProgress();
+  easter.style.transform = `translateX(${(1 - p) * 100}%)`;
 }
 
 function scrollWheelToBpm(bpm, smooth = true) {
@@ -404,10 +425,16 @@ function onWheelScroll() {
     wheel.setAttribute('aria-valuenow', String(bpm));
     playWheelTick();
   }
-  // Snap to exact tick after scroll settles
+  // Easter follows scrollLeft continuously, even past BPM_MAX where
+  // bpm doesn't change anymore.
+  updateEaster();
+  // Snap to exact tick after scroll settles — but NOT in the easter
+  // zone, otherwise the reveal would auto-collapse on every release.
   clearTimeout(scrollEndTimer);
   scrollEndTimer = setTimeout(() => {
     if (suppressWheelScroll) return;
+    const maxBpmScroll = (BPM_MAX - BPM_MIN) * TICK_PX;
+    if (wheel.scrollLeft > maxBpmScroll) return;
     const targetLeft = (state.bpm - BPM_MIN) * TICK_PX;
     if (Math.abs(wheel.scrollLeft - targetLeft) > 1) {
       scrollWheelToBpm(state.bpm, true);

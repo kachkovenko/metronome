@@ -181,6 +181,25 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* overflow:hidden so the easter-egg image is clipped by the card's
+     rounded corners as it slides in/out from the right. */
+  overflow: hidden;
+}
+
+/* Easter egg — slides in from behind the card's right edge as the wheel
+   is scrolled past BPM 300. JS sets transform: translateX(...) per
+   scroll position, hidden when state.bpm < BPM_MAX. */
+.bpm-easter {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+  transform: translateX(100%);
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .bpm-icon-btn {

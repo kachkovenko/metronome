@@ -1,4 +1,4 @@
-const CACHE = 'metronome-v36';
+const CACHE = 'metronome-v37';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './icon-512.png',
   './icon-180.png',
   './silent.mp3',
+  './easter.jpeg',
   './sessions/drum-beginner-session.json',
 ];
 
