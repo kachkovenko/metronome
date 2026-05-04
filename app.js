@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.10.2';
+const APP_VERSION = '1.10.3';
 
 const state = {
   bpm: 100,
@@ -758,7 +758,7 @@ function bind() {
     if (state.countinActive) return;  // can't change mid-countdown
     openModal('countin-modal');
   });
-  document.querySelectorAll('.countin-option, .countin-clear').forEach(b => {
+  document.querySelectorAll('.countin-option').forEach(b => {
     b.addEventListener('click', () => {
       const sec = Number(b.dataset.sec) || 0;
       setCountinSec(sec);
@@ -1542,8 +1542,6 @@ function updateCountinUI() {
   document.querySelectorAll('.countin-option').forEach(b => {
     b.classList.toggle('is-active', Number(b.dataset.sec) === state.countinSec);
   });
-  const clear = document.querySelector('.countin-clear');
-  if (clear) clear.classList.toggle('is-active', state.countinSec === 0);
 }
 
 // Called from start() when state.countinSec > 0. The metronome itself is

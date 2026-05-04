@@ -1647,21 +1647,9 @@ details > *:last-child { padding-bottom: 16px; }
   color: #000;
 }
 
-.countin-clear {
-  width: 100%;
-  margin-top: 10px;
-  padding: 14px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--muted);
-  font-family: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-.countin-clear:hover { color: var(--fg); }
-.countin-clear.is-active { color: var(--fg); font-weight: 600; }
+/* Odd 5th option ("Без задержки") sits alone on the last grid row —
+   span both columns so it doesn't look orphaned next to empty space. */
+.countin-options .countin-option:nth-child(5) { grid-column: 1 / -1; }
 
 /* === Count-in countdown overlay === */
 .countin-overlay {
