@@ -1,4 +1,4 @@
-const CACHE = 'metronome-v47';
+const CACHE = 'metronome-v48';
 const ASSETS = [
   './',
   './index.html',

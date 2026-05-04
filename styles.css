@@ -234,12 +234,19 @@ button, input, select, textarea {
 .bpm-icon-btn:hover { color: var(--fg); }
 .bpm-icon-btn:active { transform: scale(0.94); background: var(--card-3); }
 
+/* 3-column grid so the BPM number lands on the card's actual horizontal
+   center: empty 1fr on the left mirrors the "BPM" label on the right.
+   With flex+gap centering, the input+label group is centered as a unit,
+   which visually shifts the number left of the card center. */
 .bpm-display {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: baseline;
-  justify-content: center;
-  gap: 10px;
+  column-gap: 10px;
 }
+
+#bpm-input { grid-column: 2; }
+.bpm-label { grid-column: 3; justify-self: start; }
 
 #bpm-input {
   width: 180px;
