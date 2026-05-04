@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.12.1';
+const APP_VERSION = '1.12.2';
 
 const state = {
   bpm: 100,
@@ -372,10 +372,13 @@ function buildBpmWheel() {
   }
   // Real DOM spacer for the easter runway — Safari's scroll containers
   // don't always extend scrollWidth via padding-right on a flex track,
-  // but a real flex child is always counted. Without this the wheel
-  // capped at ~BPM 283 on iOS instead of reaching 300+.
+  // but a real flex child is always counted. Set width + min-width +
+  // flex-basis explicitly: Safari has been observed to ignore one or
+  // the other for empty flex children, so we send all three.
   const spacer = document.createElement('div');
   spacer.className = 'wheel-spacer';
+  spacer.style.width = `${EASTER_RUNWAY_PX}px`;
+  spacer.style.minWidth = `${EASTER_RUNWAY_PX}px`;
   spacer.style.flex = `0 0 ${EASTER_RUNWAY_PX}px`;
   track.appendChild(spacer);
   applyWheelPadding();
@@ -436,13 +439,26 @@ function onWheelScroll() {
   // Easter follows scrollLeft continuously, even past BPM_MAX where
   // bpm doesn't change anymore.
   updateEaster();
-  // Snap to exact tick after scroll settles — but NOT in the easter
-  // zone, otherwise the reveal would auto-collapse on every release.
+  // After scroll settles: in BPM zone, snap to nearest tick. In easter
+  // zone, snap binary — past halfway = full Arnold reveal, before
+  // halfway = back to BPM 300 tick. Without this, iOS momentum dies at
+  // an arbitrary midpoint and the user can't reliably "lock in" the
+  // full reveal (the springy intermediate state).
   clearTimeout(scrollEndTimer);
   scrollEndTimer = setTimeout(() => {
     if (suppressWheelScroll) return;
     const maxBpmScroll = (BPM_MAX - BPM_MIN) * TICK_PX;
-    if (wheel.scrollLeft > maxBpmScroll) return;
+    if (wheel.scrollLeft > maxBpmScroll) {
+      const fullReveal = maxBpmScroll + EASTER_RUNWAY_PX;
+      const halfway = maxBpmScroll + EASTER_RUNWAY_PX / 2;
+      const target = wheel.scrollLeft >= halfway ? fullReveal : maxBpmScroll;
+      if (Math.abs(wheel.scrollLeft - target) > 1) {
+        suppressWheelScroll = true;
+        wheel.scrollTo({ left: target, behavior: 'smooth' });
+        setTimeout(() => { suppressWheelScroll = false; }, 350);
+      }
+      return;
+    }
     const targetLeft = (state.bpm - BPM_MIN) * TICK_PX;
     if (Math.abs(wheel.scrollLeft - targetLeft) > 1) {
       scrollWheelToBpm(state.bpm, true);

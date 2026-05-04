@@ -193,19 +193,22 @@ button, input, select, textarea {
 }
 
 /* Easter egg — slides in from behind the card's right edge as the wheel
-   is scrolled past BPM 300. JS sets transform: translateX(...) per
-   scroll position, hidden when state.bpm < BPM_MAX. */
+   is scrolled past BPM 300. Top-anchored with height 60% so the bottom
+   of the image roughly aligns with the bottom of the BPM wheel — covers
+   the BPM number + corner icons but stays out of the +/- buttons and
+   TAP TEMPO. JS sets transform: translateX(...) per scroll position. */
 .bpm-easter {
   position: absolute;
+  top: 0;
   right: 0;
-  bottom: 0;
-  width: 100%;
-  height: auto;
+  height: 60%;
+  width: auto;
   transform: translateX(100%);
   pointer-events: none;
   z-index: 1;
   user-select: none;
   -webkit-user-drag: none;
+  border-radius: var(--radius-sm);
 }
 
 .bpm-icon-btn {
