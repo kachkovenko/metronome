@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.10.1';
 
 const state = {
   bpm: 100,
@@ -214,16 +214,18 @@ async function start() {
   state.currentBeat = 0;
   state.currentSub = 0;
   state.trainerBarCount = 0;
-  nextNoteTime = audioCtx.currentTime + 0.05;
+  // Count-in: just push the first scheduled note out by countinSec seconds
+  // so the metronome stays silent during the countdown. Scheduler runs
+  // normally — it just won't queue anything until we get within the
+  // SCHEDULE_AHEAD window of nextNoteTime.
+  const delaySec = state.countinSec > 0 ? state.countinSec : 0;
+  nextNoteTime = audioCtx.currentTime + delaySec + 0.05;
   scheduler();
   requestAnimationFrame(draw);
   updatePlayButton();
   requestWakeLock();
-  // If count-in is armed, show the big-number countdown overlay (the
-  // metronome ticks throughout, so when the overlay disappears the
-  // user feels a smooth transition from count-in to real start).
-  if (state.countinSec > 0 && !state.countinActive) {
-    runCountdownOverlay(state.countinSec);
+  if (delaySec > 0 && !state.countinActive) {
+    runCountdownOverlay(delaySec);
   }
 }
 

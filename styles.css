@@ -551,6 +551,16 @@ button, input, select, textarea {
   box-shadow: 0 8px 32px rgba(255, 255, 255, 0.2);
 }
 
+/* Outline in --bg color around Stop, but ONLY when count-in is also
+   armed (i.e. both pills are white). Otherwise the two white pills run
+   into each other where the count-in tab pokes out. The outline is
+   invisible against bg on the other three sides. */
+.countin-btn.armed + .play-btn.playing {
+  box-shadow:
+    0 0 0 4px var(--bg),
+    0 8px 32px rgba(255, 255, 255, 0.2);
+}
+
 .play-icon { font-size: 24px; }
 
 .hint {
@@ -1387,6 +1397,7 @@ details > *:last-child { padding-bottom: 16px; }
 }
 [data-theme="light"] .play-btn { box-shadow: none; }
 [data-theme="light"] .play-btn.playing { background: var(--fg); color: #fff; box-shadow: none; }
+[data-theme="light"] .countin-btn.armed + .play-btn.playing { box-shadow: 0 0 0 4px var(--bg); }
 [data-theme="light"] .vol input[type="range"]::-webkit-slider-thumb,
 [data-theme="light"] #mute-pct::-webkit-slider-thumb { background: var(--accent-text); }
 [data-theme="light"] .vol input[type="range"]::-moz-range-thumb,
