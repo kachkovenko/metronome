@@ -128,8 +128,27 @@
       <!-- Tab: Тренировки -->
       <section class="tab-view" id="tab-training" data-tab="training">
         <div class="tab-section">
-          <h2 class="tab-section-title">Сессии</h2>
-          <div id="sessions-list" class="sessions-list"></div>
+          <h2 class="tab-section-title">Программы тренировок</h2>
+          <div id="programs-list" class="programs-list">
+            <p class="programs-empty">Программ пока нет</p>
+          </div>
+          <div class="programs-actions">
+            <button class="program-action-btn" id="program-create">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span>Создать</span>
+            </button>
+            <button class="program-action-btn" id="program-import">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Импорт</span>
+            </button>
+          </div>
         </div>
 
         <div class="tab-section">
@@ -343,56 +362,6 @@
       </div>
       <div class="presets" id="user-presets"></div>
     </div>
-  </div>
-
-  <!-- Walkthrough screen -->
-  <div id="walk-screen" class="fullscreen" aria-hidden="true">
-    <header class="fs-header">
-      <button class="icon-btn" id="walk-close" aria-label="Закрыть">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
-        </svg>
-      </button>
-      <div class="walk-progress">
-        <span id="walk-block-name"></span>
-        <span class="walk-step muted" id="walk-step-info"></span>
-      </div>
-      <div></div>
-    </header>
-    <div class="fs-body walk-body">
-      <h1 id="walk-title"></h1>
-      <p id="walk-instructions" class="walk-instructions"></p>
-
-      <div class="walk-meta">
-        <div class="walk-meta-item">
-          <span class="walk-meta-label">Темп</span>
-          <span class="walk-meta-value"><span id="walk-bpm">100</span> BPM</span>
-        </div>
-        <div class="walk-meta-item">
-          <span class="walk-meta-label">Размер</span>
-          <span class="walk-meta-value" id="walk-timesig">4 / 4</span>
-        </div>
-        <div class="walk-meta-item">
-          <span class="walk-meta-label">Деления</span>
-          <span class="walk-meta-value" id="walk-sub">♫</span>
-        </div>
-      </div>
-
-      <div id="walk-sticking" class="walk-sticking"></div>
-      <div id="walk-groove" class="walk-groove"></div>
-      <p id="walk-tip" class="walk-tip muted"></p>
-
-      <div class="walk-timer">
-        <div class="walk-timer-bar"><div class="walk-timer-bar-fill" id="walk-timer-fill"></div></div>
-        <div class="walk-timer-text" id="walk-timer-text">0:00</div>
-      </div>
-    </div>
-    <footer class="walk-actions">
-      <button class="walk-btn" id="walk-prev">←</button>
-      <button class="walk-btn" id="walk-bpm-down">−5 BPM</button>
-      <button class="walk-btn" id="walk-bpm-up">+5 BPM</button>
-      <button class="walk-btn primary" id="walk-next">Дальше →</button>
-    </footer>
   </div>
 
   <!-- Fullscreen flash view -->
