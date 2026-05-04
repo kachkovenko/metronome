@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.10.4';
+const APP_VERSION = '1.11.0';
 
 const state = {
   bpm: 100,
@@ -53,14 +53,29 @@ const state = {
   countinActive: false,
   countinTimer: null,
   countinSec: 0,
+
+  // Sound profile per beat type (key from SOUND_TYPES)
+  soundAccent: 'click',
+  soundBeat: 'click',
 };
 
 const BT_LATENCY_KEY = 'metronome.bt-latency-ms';
 const BT_AUTO_KEY = 'metronome.bt-auto';
 const INPUT_LATENCY_KEY = 'metronome.input-latency-ms';
 const THEME_KEY = 'metronome.theme';
+const SOUND_ACCENT_KEY = 'metronome.sound-accent';
+const SOUND_BEAT_KEY = 'metronome.sound-beat';
 
 const THEME_COLORS = { dark: '#000000', light: '#f5f5f7' };
+
+// Click-sound profiles. Frequency stays per beat type (accent=1500, beat=900);
+// these only swap the oscillator waveform, which gives perceptibly different
+// timbres without overcomplicating the synth path.
+const SOUND_TYPES = {
+  click: { label: 'Клик',   wave: 'square' },
+  wood:  { label: 'Дерево', wave: 'triangle' },
+  beep:  { label: 'Бип',    wave: 'sine' },
+};
 
 let audioCtx = null;
 let silentAudio = null;
@@ -142,13 +157,19 @@ function playClick(type, time) {
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
 
-  let freq, vol, dur;
-  if (type === 'accent')      { freq = 1500; vol = state.volAccent;       dur = 0.05; }
-  else if (type === 'beat')   { freq = 900;  vol = state.volBeat;         dur = 0.05; }
-  else if (type === 'soft')   { freq = 700;  vol = state.volBeat * 0.5;   dur = 0.04; }
-  else                        { freq = 600;  vol = state.volSub;          dur = 0.03; }
+  // Waveform comes from the user's sound choice for accent vs. beat.
+  // 'soft' and 'sub' (subdivision tick) follow the beat sound — they're
+  // quieter variants of the regular beat, so should share its timbre.
+  const accentWave = SOUND_TYPES[state.soundAccent]?.wave || 'square';
+  const beatWave   = SOUND_TYPES[state.soundBeat]?.wave   || 'square';
 
-  osc.type = 'square';
+  let freq, vol, dur, wave;
+  if (type === 'accent')      { freq = 1500; vol = state.volAccent;       dur = 0.05; wave = accentWave; }
+  else if (type === 'beat')   { freq = 900;  vol = state.volBeat;         dur = 0.05; wave = beatWave; }
+  else if (type === 'soft')   { freq = 700;  vol = state.volBeat * 0.5;   dur = 0.04; wave = beatWave; }
+  else                        { freq = 600;  vol = state.volSub;          dur = 0.03; wave = beatWave; }
+
+  osc.type = wave;
   osc.frequency.value = freq;
   const peak = Math.max(0.0001, vol * state.volMaster);
   gain.gain.setValueAtTime(peak, time);
@@ -371,6 +392,9 @@ let scrollEndTimer = null;
 
 function onWheelScroll() {
   if (suppressWheelScroll) return;
+  // Lazy-create AudioContext on first scroll so the wheel-tick can play
+  // (scroll/touch counts as a user gesture for resume()).
+  if (!audioCtx) ensureAudio();
   const wheel = $('bpm-wheel');
   const idx = Math.round(wheel.scrollLeft / TICK_PX);
   const bpm = Math.max(BPM_MIN, Math.min(BPM_MAX, BPM_MIN + idx));
@@ -378,6 +402,7 @@ function onWheelScroll() {
     state.bpm = bpm;
     $('bpm-input').value = bpm;
     wheel.setAttribute('aria-valuenow', String(bpm));
+    playWheelTick();
   }
   // Snap to exact tick after scroll settles
   clearTimeout(scrollEndTimer);
@@ -401,6 +426,64 @@ function setBpm(v) {
     wheel.setAttribute('aria-valuenow', String(v));
     scrollWheelToBpm(v, true);
   }
+}
+
+// --- Wheel tick (haptic + soft click on BPM scroll) ---
+//
+// Throttle to ~30 ticks/sec max — onscroll can fire faster than that on
+// fast swipes, and stacking too many tiny envelopes muddies the audio.
+let lastWheelTickTime = 0;
+const WHEEL_TICK_MIN_INTERVAL = 0.03;
+
+function playWheelTick() {
+  // Haptic first — works on Android Chrome, no-op on iOS Safari (Apple
+  // hasn't implemented Vibration API in mobile Safari).
+  try { navigator.vibrate?.(8); } catch {}
+
+  if (!audioCtx || audioCtx.state !== 'running') return;
+  const now = audioCtx.currentTime;
+  if (now - lastWheelTickTime < WHEEL_TICK_MIN_INTERVAL) return;
+  lastWheelTickTime = now;
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = 200;  // low → reads as a soft "thump"
+  const peak = 0.06 * state.volMaster;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(Math.max(peak, 0.001), now + 0.003);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.022);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.03);
+}
+
+// --- Sound profile picker ---
+
+async function applySoundChoice(beatType, soundKey) {
+  if (!SOUND_TYPES[soundKey]) return;
+  if (beatType === 'accent') {
+    state.soundAccent = soundKey;
+    try { localStorage.setItem(SOUND_ACCENT_KEY, soundKey); } catch {}
+  } else {
+    state.soundBeat = soundKey;
+    try { localStorage.setItem(SOUND_BEAT_KEY, soundKey); } catch {}
+  }
+  updateSoundPickerUI();
+  // Preview the new sound at current volumes
+  await ensureAudio();
+  if (audioCtx?.state === 'running') {
+    playClick(beatType, audioCtx.currentTime + 0.01);
+  }
+}
+
+function updateSoundPickerUI() {
+  document.querySelectorAll('#sound-accent-picker .preset').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.sound === state.soundAccent);
+  });
+  document.querySelectorAll('#sound-beat-picker .preset').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.sound === state.soundBeat);
+  });
 }
 
 function updateSubDisplay() {
@@ -741,6 +824,14 @@ function bind() {
   // Theme picker
   document.querySelectorAll('#theme-picker .preset').forEach(b => {
     b.addEventListener('click', () => applyTheme(b.dataset.theme));
+  });
+
+  // Sound profile pickers (one for accent, one for beat)
+  document.querySelectorAll('#sound-accent-picker .preset').forEach(b => {
+    b.addEventListener('click', () => applySoundChoice('accent', b.dataset.sound));
+  });
+  document.querySelectorAll('#sound-beat-picker .preset').forEach(b => {
+    b.addEventListener('click', () => applySoundChoice('beat', b.dataset.sound));
   });
 
   // Fullscreen flash view
@@ -1590,6 +1681,12 @@ function init() {
   // avoid flash; this syncs the meta tag and the picker's active state).
   applyTheme(loadTheme());
 
+  // Restore persisted sound choices
+  const storedAccent = localStorage.getItem(SOUND_ACCENT_KEY);
+  if (storedAccent && SOUND_TYPES[storedAccent]) state.soundAccent = storedAccent;
+  const storedBeat = localStorage.getItem(SOUND_BEAT_KEY);
+  if (storedBeat && SOUND_TYPES[storedBeat]) state.soundBeat = storedBeat;
+
   bind();
 
   // Apply BT latency UI state after binding
@@ -1604,6 +1701,7 @@ function init() {
   updateTimeDisplay();
   updatePlayButton();
   updateCountinUI();
+  updateSoundPickerUI();
   setupVersionAndUpdate();
   loadSessions();
   // Wheel must build after layout settles so clientWidth is correct
