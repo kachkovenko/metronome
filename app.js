@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.12.1';
 
 const state = {
   bpm: 100,
@@ -370,6 +370,14 @@ function buildBpmWheel() {
     tick.dataset.bpm = bpm;
     track.appendChild(tick);
   }
+  // Real DOM spacer for the easter runway — Safari's scroll containers
+  // don't always extend scrollWidth via padding-right on a flex track,
+  // but a real flex child is always counted. Without this the wheel
+  // capped at ~BPM 283 on iOS instead of reaching 300+.
+  const spacer = document.createElement('div');
+  spacer.className = 'wheel-spacer';
+  spacer.style.flex = `0 0 ${EASTER_RUNWAY_PX}px`;
+  track.appendChild(spacer);
   applyWheelPadding();
   scrollWheelToBpm(state.bpm, false);
 }
@@ -378,10 +386,10 @@ function applyWheelPadding() {
   const wheel = $('bpm-wheel');
   const track = $('wheel-track');
   const halfW = wheel.clientWidth / 2;
+  // Both sides halfW so the first/last BPM tick can reach the center.
+  // Easter runway comes from the .wheel-spacer flex child.
   track.style.paddingLeft = halfW + 'px';
-  // halfW lets the BPM_MAX tick reach center; +EASTER_RUNWAY_PX adds
-  // empty scrollable space beyond that for the easter reveal.
-  track.style.paddingRight = (halfW + EASTER_RUNWAY_PX) + 'px';
+  track.style.paddingRight = halfW + 'px';
 }
 
 function easterProgress() {
@@ -777,6 +785,11 @@ function bind() {
   // BPM wheel: native horizontal scroll (touch + trackpad horizontal)
   const wheel = $('bpm-wheel');
   wheel.addEventListener('scroll', onWheelScroll, { passive: true });
+  // Resume the AudioContext on first touch/click so the wheel-tick
+  // sound works immediately — by the time the first scroll event fires,
+  // resume() will have completed. Without this the tick was silent
+  // until the user had started+stopped the metronome at least once.
+  wheel.addEventListener('pointerdown', () => { ensureAudio(); }, { passive: true });
 
   // Mouse wheel / trackpad: translate any wheel delta into horizontal scroll
   wheel.addEventListener('wheel', (e) => {

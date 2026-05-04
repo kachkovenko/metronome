@@ -57,9 +57,12 @@ button, input, select, textarea {
   overflow: hidden;
 }
 
-/* Topbar + tab-bar are fixed-size; tab-views stretches between them */
+/* Topbar + tab-bar are fixed-size; tab-views stretches between them.
+   tab-views deliberately keeps overflow visible so the play-btn's lime
+   glow can extend past its edges into .app's safe-area padding before
+   .app's overflow:hidden clips at the viewport. */
 .app > .topbar { flex: 0 0 auto; }
-.app > .tab-views { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.app > .tab-views { flex: 1 1 auto; min-height: 0; }
 .app > .tab-bar { flex: 0 0 auto; }
 
 /* Tab views — only active one is visible. Each handles its own layout. */
@@ -71,8 +74,11 @@ button, input, select, textarea {
 }
 .tab-view.active { display: flex; }
 
-/* Метроном tab: keep no-scroll behavior, play button anchors to bottom */
-#tab-metronome { overflow: hidden; padding-bottom: 8px; }
+/* Метроном tab: no internal scroll — children are flex-shrink: 0 and the
+   play-row's auto margins absorb extra space. overflow stays visible so
+   shadows from play-btn can extend rightward (would otherwise be clipped
+   right at the button's edge). */
+#tab-metronome { padding-bottom: 8px; }
 #tab-metronome > * { flex-shrink: 0; }
 /* Both auto margins so the play-row sits in the middle of the remaining
    vertical space — equal gap above (between beat-card and play-row) and
@@ -303,6 +309,11 @@ button, input, select, textarea {
   background: rgba(255, 255, 255, 0.28);
   border-radius: 1px;
 }
+
+/* Empty scroll runway after the last tick — width set inline in JS
+   (matches EASTER_RUNWAY_PX). Real DOM child so Safari counts it
+   into scrollWidth. */
+.wheel-spacer { height: 1px; pointer-events: none; }
 
 .wheel-center {
   position: absolute;
