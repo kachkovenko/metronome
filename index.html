@@ -132,9 +132,7 @@
       <section class="tab-view" id="tab-training" data-tab="training">
         <div class="tab-section">
           <h2 class="tab-section-title">Программы тренировок</h2>
-          <div id="programs-list" class="programs-list">
-            <p class="programs-empty">Программ пока нет</p>
-          </div>
+          <div id="programs-list" class="programs-list"></div>
           <div class="programs-actions">
             <button class="program-action-btn" id="program-create">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
@@ -433,15 +431,84 @@
     <div class="countin-num" id="countin-num">5</div>
   </div>
 
-  <!-- Training tab "coming soon" notice — shown on every tab switch to Training -->
-  <div id="training-modal" class="modal" aria-hidden="true">
+  <!-- Program preview sheet — shown when user taps a program tile -->
+  <div id="program-preview-modal" class="modal" aria-hidden="true">
     <div class="modal-backdrop" data-close></div>
     <div class="sheet">
       <div class="sheet-handle"></div>
-      <h3>Раздел в разработке</h3>
-      <p class="muted">Скоро тут появится много интересного.</p>
-      <div class="warning-actions training-actions">
-        <button class="warning-ok" id="training-ok">Буду знать</button>
+      <h3 id="program-preview-title">Программа</h3>
+      <p class="program-preview-meta" id="program-preview-meta"></p>
+      <ol class="program-preview-blocks" id="program-preview-blocks"></ol>
+      <button class="program-start-btn" id="program-start">Начать</button>
+    </div>
+  </div>
+
+  <!-- Program runner — full-screen view that runs an active program -->
+  <div id="program-runner" class="program-runner" aria-hidden="true">
+    <header class="runner-top">
+      <button class="icon-btn" id="runner-close" aria-label="Закрыть программу">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+      <div class="runner-title-wrap">
+        <span class="runner-program-name" id="runner-program-name"></span>
+        <span class="runner-block-pos" id="runner-block-pos"></span>
+      </div>
+      <div class="runner-spacer"></div>
+    </header>
+
+    <main class="runner-content" id="runner-content">
+      <div class="runner-block-type" id="runner-block-type"></div>
+      <h2 class="runner-block-title" id="runner-block-title"></h2>
+      <div class="runner-exercise" id="runner-exercise"></div>
+      <p class="runner-reference" id="runner-reference"></p>
+      <div class="runner-meta">
+        <div class="runner-meta-item"><span class="runner-meta-label">BPM</span><span class="runner-meta-value" id="runner-bpm">—</span></div>
+        <div class="runner-meta-item"><span class="runner-meta-label">Размер</span><span class="runner-meta-value" id="runner-sig">—</span></div>
+        <div class="runner-meta-item"><span class="runner-meta-label">Деления</span><span class="runner-meta-value" id="runner-sub">—</span></div>
+      </div>
+      <div class="runner-beat-indicator beat-indicator" id="runner-beat-indicator"></div>
+      <p class="runner-notes" id="runner-notes"></p>
+    </main>
+
+    <footer class="runner-foot">
+      <div class="runner-timer-row">
+        <div class="runner-timer" id="runner-timer">--:--</div>
+        <button class="runner-done-btn" id="runner-done" hidden>Готово, дальше →</button>
+      </div>
+      <div class="runner-progress"><div class="runner-progress-fill" id="runner-progress-fill"></div></div>
+      <div class="runner-controls">
+        <button class="runner-ctrl-btn" id="runner-extend" aria-label="+ 2 минуты">+2 мин</button>
+        <button class="runner-play-btn" id="runner-play" aria-label="Старт/Стоп">
+          <span class="runner-play-icon">▶</span>
+        </button>
+        <button class="runner-ctrl-btn" id="runner-skip" aria-label="Следующий блок">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 4 15 12 5 20 5 4"/>
+            <line x1="19" y1="5" x2="19" y2="19"/>
+          </svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Block transition overlay — appears when a block ends -->
+    <div class="runner-transition" id="runner-transition" aria-hidden="true">
+      <div class="runner-transition-card">
+        <p class="runner-transition-prefix" id="runner-transition-prefix">Следующий блок</p>
+        <h3 class="runner-transition-title" id="runner-transition-title">—</h3>
+        <p class="runner-transition-meta" id="runner-transition-meta"></p>
+        <button class="runner-transition-btn" id="runner-transition-go">Поехали →</button>
+      </div>
+    </div>
+
+    <!-- Finish overlay — appears after the last block -->
+    <div class="runner-finish" id="runner-finish" aria-hidden="true">
+      <div class="runner-transition-card">
+        <p class="runner-transition-prefix">Готово</p>
+        <h3 class="runner-transition-title">Программа завершена</h3>
+        <p class="runner-transition-meta" id="runner-finish-meta"></p>
+        <button class="runner-transition-btn" id="runner-finish-close">Закрыть</button>
       </div>
     </div>
   </div>

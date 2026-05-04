@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.16.2';
+const APP_VERSION = '1.17.0';
 
 const state = {
   bpm: 100,
@@ -109,6 +109,400 @@ const BUILTIN_PRESETS = [
   { name: 'Шаффл (110, 4/4 ♪³)', bpm: 110, num: 4, den: 4, sub: 3 },
   { name: '6/8 (90)', bpm: 90, num: 6, den: 8, sub: 1 },
 ];
+
+// --- Programs (training routines) ---
+//
+// A program is an ordered list of blocks. Each block:
+//   type:        'warmup'|'rudiment'|'coordination'|'song'|'cooldown' (for icon/label)
+//   title:       short heading shown in the runner
+//   duration:    seconds — countdown for auto-timed blocks; suggested for userPaced
+//   userPaced:   true → "Готово, дальше" button instead of countdown
+//   bpm:         starting tempo
+//   bpmRamp:     optional { to, step, every } — drives the existing Speed Trainer
+//   sig:         { num, den }
+//   sub:         1=♩ 2=♫ 3=♪³ 4=♬
+//   exercise.kind:
+//     'sticking' → exercise.pattern (e.g. 'RLRR LRLL') rendered big
+//     'groove'   → exercise.grid { hat:[…], snare:[…], kick:[…] } 0|1 cells
+//     'free'     → no exercise visual, only notes
+//   exercise.reference: optional "В стиле X (Y), Z (W)" — songs are referenced
+//                       by name as cultural pointers; patterns themselves are
+//                       generic basics, not transcriptions. Audio/lyrics never.
+//   exercise.notes: short instruction shown under the exercise
+const PROGRAMS = [
+  // === Beginner ===
+  {
+    id: 'beginner-15', name: 'Начинающий · 15 мин', difficulty: 'beginner', duration: 15,
+    blocks: [
+      { type: 'warmup', title: 'Разминка · одиночные', duration: 120,
+        bpm: 60, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L  R L R L',
+          notes: 'Восьмыми. Ровность и одинаковая громкость важнее темпа. Слабая рука не отстаёт.' } },
+      { type: 'rudiment', title: 'Paradiddle', duration: 240,
+        bpm: 70, bpmRamp: { to: 80, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R   L R L L',
+          notes: 'Темп растёт сам каждые 4 такта. Чисто > быстро.' } },
+      { type: 'coordination', title: 'Базовый рок-бит', duration: 240,
+        bpm: 75, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          notes: 'Хэт восьмыми, снейр на 2 и 4, бочка на 1 и 3. Минимум 8 тактов без сбоев.' } },
+      { type: 'song', title: 'Песня · в стиле Yellow', duration: 240, userPaced: true,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Yellow (Coldplay) · ≈ 87 BPM',
+          notes: 'Сначала чисто на 80 BPM. Когда играешь без сбоев 8 тактов — добавь 5 BPM, и так до 87.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 60,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Сыграй то, что хочется. Заканчивай на удовольствии, а не на борьбе.' } },
+    ],
+  },
+  {
+    id: 'beginner-30', name: 'Начинающий · 30 мин', difficulty: 'beginner', duration: 30,
+    blocks: [
+      { type: 'warmup', title: 'Разминка · одиночные', duration: 120,
+        bpm: 60, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L  R L R L',
+          notes: 'Восьмыми. Ровность важнее громкости.' } },
+      { type: 'warmup', title: 'Разминка · двойки', duration: 120,
+        bpm: 60, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R R L L  R R L L',
+          notes: 'Двойки восьмыми. Второй удар выжимай отскоком, не вторым взмахом.' } },
+      { type: 'rudiment', title: 'Single Stroke Roll', duration: 240,
+        bpm: 70, bpmRamp: { to: 85, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L  R L R L',
+          notes: 'Темп растёт автоматически. Останавливайся, если громкость поплыла.' } },
+      { type: 'rudiment', title: 'Paradiddle', duration: 240,
+        bpm: 70, bpmRamp: { to: 80, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R   L R L L',
+          notes: 'Чисто > быстро. На максимуме 1 минута без сбоев — задача дня.' } },
+      { type: 'coordination', title: 'Базовый рок-бит', duration: 210,
+        bpm: 75, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          notes: 'Хэт восьмыми, снейр 2 и 4, бочка 1 и 3.' } },
+      { type: 'coordination', title: 'Усложнение · бочка на «1 и»', duration: 210,
+        bpm: 75, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,1,0,0,1,0,0,0] },
+          notes: 'То же, но добавь бочку сразу после первой доли (на «и»).' } },
+      { type: 'song', title: 'Песня · в стиле Yellow', duration: 240, userPaced: true,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Yellow (Coldplay) · ≈ 87 BPM',
+          notes: 'Чисто на 80 → +5 BPM → +5 BPM. Не разгоняйся, пока есть сбои.' } },
+      { type: 'song', title: 'Песня · в стиле Seven Nation Army', duration: 240, userPaced: true,
+        bpm: 105, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Seven Nation Army (The White Stripes) · ≈ 124 BPM',
+          notes: 'Тот же рисунок, но быстрее и жёстче. Стартуй с 105, целевой темп — 124.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 180,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Сыграй любимый трек или просто что хочется.' } },
+    ],
+  },
+  {
+    id: 'beginner-60', name: 'Начинающий · 60 мин', difficulty: 'beginner', duration: 60,
+    blocks: [
+      { type: 'warmup', title: 'Разминка · одиночные', duration: 180,
+        bpm: 60, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L  R L R L', notes: 'Восьмыми. Ровность.' } },
+      { type: 'warmup', title: 'Разминка · двойки', duration: 180,
+        bpm: 65, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R R L L  R R L L', notes: 'Используй отскок для второго удара.' } },
+      { type: 'warmup', title: 'Разминка · 8 на руку', duration: 120,
+        bpm: 70, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: '8R · 8L · 4R · 4L · 2R · 2L · RL',
+          notes: 'Пирамида: 8 правой → 8 левой → 4/4 → 2/2 → одиночные.' } },
+      { type: 'rudiment', title: 'Single Stroke Roll', duration: 300,
+        bpm: 70, bpmRamp: { to: 85, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L  R L R L', notes: 'Темп растёт сам.' } },
+      { type: 'rudiment', title: 'Double Stroke Roll', duration: 300,
+        bpm: 70, bpmRamp: { to: 85, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R R L L  R R L L', notes: 'Двойки. Чисто > быстро.' } },
+      { type: 'rudiment', title: 'Paradiddle', duration: 300,
+        bpm: 70, bpmRamp: { to: 85, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R   L R L L', notes: 'Парадиддл.' } },
+      { type: 'coordination', title: 'Рок-бит · вариант 1', duration: 180,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          notes: 'Базовый: бочка на 1 и 3.' } },
+      { type: 'coordination', title: 'Рок-бит · вариант 2', duration: 180,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,1,0,0,1,0,0,0] },
+          notes: 'Бочка на 1, «1 и», 3.' } },
+      { type: 'coordination', title: 'Рок-бит · вариант 3', duration: 180,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,1,0] },
+          notes: 'Бочка на 1, 3, «3 и».' } },
+      { type: 'coordination', title: 'Рок-бит · хэт шестнадцатыми', duration: 180,
+        bpm: 75, sig: { num: 4, den: 4 }, sub: 4,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], snare: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], kick: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0] },
+          notes: 'То же, но хэт шестнадцатыми. Темп ниже — рука должна успевать.' } },
+      { type: 'song', title: 'Песня · в стиле Yellow', duration: 420, userPaced: true,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Yellow (Coldplay) · ≈ 87 BPM',
+          notes: 'Чисто на 80 → +5 → +5. Не торопись.' } },
+      { type: 'song', title: 'Песня · в стиле With or Without You', duration: 420, userPaced: true,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле With or Without You (U2) · ≈ 110 BPM',
+          notes: 'Тот же базовый рисунок, чуть быстрее. Целься в 110.' } },
+      { type: 'song', title: 'Песня · в стиле Seven Nation Army', duration: 420, userPaced: true,
+        bpm: 110, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Seven Nation Army (The White Stripes) · ≈ 124 BPM',
+          notes: 'Целевой темп — 124. Жёсткий бэкбит на снейре.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 300,
+        bpm: 80, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Свободная игра под любимую музыку. Без метронома, если хочешь.' } },
+    ],
+  },
+
+  // === Intermediate ===
+  {
+    id: 'intermediate-15', name: 'Средний · 15 мин', difficulty: 'intermediate', duration: 15,
+    blocks: [
+      { type: 'warmup', title: 'Разминка', duration: 120,
+        bpm: 70, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L · R R L L',
+          notes: '1 минута одиночными, 1 минута двойками. Запястье свободно.' } },
+      { type: 'rudiment', title: 'Double Stroke Roll', duration: 180,
+        bpm: 80, bpmRamp: { to: 100, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R R L L  R R L L',
+          notes: 'Второй удар выжимай пальцами. Не маши запястьем дважды.' } },
+      { type: 'coordination', title: 'Бочка четвертями', duration: 240,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,1,0,1,0,1,0] },
+          notes: 'Бочка на каждую четверть. Развивает выносливость на ноге.' } },
+      { type: 'song', title: 'Песня · в стиле Smells Like Teen Spirit', duration: 300, userPaced: true,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Smells Like Teen Spirit (Nirvana), куплет · ≈ 117 BPM',
+          notes: 'Базовый рисунок куплета. Стартуй на 100, целевой 117.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 60,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Свободно.' } },
+    ],
+  },
+  {
+    id: 'intermediate-30', name: 'Средний · 30 мин', difficulty: 'intermediate', duration: 30,
+    blocks: [
+      { type: 'warmup', title: 'Разминка', duration: 240,
+        bpm: 75, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L · R R L L · R L R R  L R L L',
+          notes: 'Первая минута — одиночные, вторая — двойки, последние две — парадиддл.' } },
+      { type: 'rudiment', title: 'Double Stroke Roll', duration: 180,
+        bpm: 80, bpmRamp: { to: 100, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R R L L  R R L L', notes: 'Двойки. Темп растёт сам.' } },
+      { type: 'rudiment', title: 'Paradiddle вариации', duration: 300,
+        bpm: 85, bpmRamp: { to: 100, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R   L R L L',
+          notes: 'Сначала прямой парадиддл. Потом обратный: L R L L · R L R R. Чередуй каждые 8 тактов.' } },
+      { type: 'coordination', title: 'Half-time бит', duration: 360,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,0,0,1,0,0,0], kick: [1,0,0,0,0,0,0,0] },
+          notes: 'Снейр только на 3 — сильно меняет ощущение. Бочка на 1.' } },
+      { type: 'song', title: 'Песня · в стиле Back in Black', duration: 300, userPaced: true,
+        bpm: 85, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,1,1,0,0,0] },
+          reference: 'В стиле Back in Black (AC/DC) · ≈ 96 BPM',
+          notes: 'Синкопа на бочке (1 и «2 и»). Стартуй с 85, целевой 96.' } },
+      { type: 'song', title: 'Песня · в стиле Smells Like Teen Spirit', duration: 300, userPaced: true,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Smells Like Teen Spirit (Nirvana), куплет · ≈ 117 BPM',
+          notes: 'Целевой темп 117.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 120,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Свободно.' } },
+    ],
+  },
+  {
+    id: 'intermediate-60', name: 'Средний · 60 мин', difficulty: 'intermediate', duration: 60,
+    blocks: [
+      { type: 'warmup', title: 'Разминка', duration: 420,
+        bpm: 75, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R L · R R L L · R L R R  L R L L · 8R 8L 4/4 2/2',
+          notes: '~2 мин одиночные → ~2 мин двойки → ~2 мин парадиддл → ~1 мин пирамида.' } },
+      { type: 'rudiment', title: 'Double Stroke Roll', duration: 420,
+        bpm: 80, bpmRamp: { to: 105, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R R L L  R R L L', notes: 'Длинный прогон. Не разгоняйся раньше времени.' } },
+      { type: 'rudiment', title: 'Paradiddle вариации', duration: 420,
+        bpm: 85, bpmRamp: { to: 105, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R   L R L L',
+          notes: 'Каждые 8 тактов меняй: прямой → обратный (L R L L · R L R R) → флэм-парадиддл.' } },
+      { type: 'coordination', title: 'Half-time бит', duration: 360,
+        bpm: 95, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,0,0,1,0,0,0], kick: [1,0,0,0,0,0,0,0] },
+          notes: 'Снейр на 3.' } },
+      { type: 'coordination', title: 'Шаффл', duration: 420,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 3,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          notes: 'Деления — триоли. Хэт играет 1-ю и 3-ю триоль каждой доли (1 — 3 1 — 3). Снейр 2 и 4.' } },
+      { type: 'song', title: 'Песня · в стиле Back in Black', duration: 420, userPaced: true,
+        bpm: 85, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,1,1,0,0,0] },
+          reference: 'В стиле Back in Black (AC/DC) · ≈ 96 BPM',
+          notes: 'Целевой 96.' } },
+      { type: 'song', title: 'Песня · в стиле Smells Like Teen Spirit', duration: 420, userPaced: true,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Smells Like Teen Spirit (Nirvana) · ≈ 117 BPM', notes: 'Целевой 117.' } },
+      { type: 'song', title: 'Песня · в стиле Seven Nation Army', duration: 420, userPaced: true,
+        bpm: 115, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [0,0,1,0,0,0,1,0], kick: [1,0,0,0,1,0,0,0] },
+          reference: 'В стиле Seven Nation Army (The White Stripes) · ≈ 124 BPM', notes: 'Целевой 124.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 300,
+        bpm: 95, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Свободная игра.' } },
+    ],
+  },
+
+  // === Advanced ===
+  {
+    id: 'advanced-15', name: 'Продвинутый · 15 мин', difficulty: 'advanced', duration: 15,
+    blocks: [
+      { type: 'warmup', title: 'Разминка', duration: 120,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R   L R L L · 8R 8L 4/4 2/2',
+          notes: '1 минута парадиддл, 1 минута пирамида. Запястье свободно.' } },
+      { type: 'rudiment', title: 'Flam Tap', duration: 180,
+        bpm: 90, bpmRamp: { to: 105, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'lR R · rL L · lR R · rL L',
+          notes: 'Маленькая буква — флэм (грейс-нота другой рукой). Большая — основной удар.' } },
+      { type: 'coordination', title: 'Линейный паттерн + хэт ногой', duration: 240,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,0,1,0,1,0,1,0], snare: [0,1,0,0,0,1,0,0], kick: [0,0,0,1,0,0,0,1] },
+          notes: 'Линейка: только один голос за раз. Дополнительно — хэт ногой на 2 и 4 (в сетке не показано).' } },
+      { type: 'song', title: 'Песня · в стиле Billie Jean', duration: 300, userPaced: true,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 4,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], snare: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], kick: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0] },
+          reference: 'В стиле Billie Jean (Michael Jackson) · ≈ 117 BPM',
+          notes: 'Шестнадцатые на хэте. Снейр 2 и 4, бочка 1 и 3. Целевой 117.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 60,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Свободно.' } },
+    ],
+  },
+  {
+    id: 'advanced-30', name: 'Продвинутый · 30 мин', difficulty: 'advanced', duration: 30,
+    blocks: [
+      { type: 'warmup', title: 'Разминка', duration: 240,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R  L R L L · lR R  rL L',
+          notes: '2 мин парадиддл, 2 мин flam tap.' } },
+      { type: 'rudiment', title: 'Flam Tap + 6-stroke roll', duration: 420,
+        bpm: 90, bpmRamp: { to: 110, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'lR R  rL L  ·  R LL RR L',
+          notes: 'Каждые 8 тактов меняй между flam tap и 6-stroke roll (RLLRRL).' } },
+      { type: 'coordination', title: 'Линейный + хэт ногой 2,4', duration: 240,
+        bpm: 95, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,0,1,0,1,0,1,0], snare: [0,1,0,0,0,1,0,0], kick: [0,0,0,1,0,0,0,1] },
+          notes: 'Линейный паттерн на руках, хэт ногой на 2 и 4 (в сетке не показано).' } },
+      { type: 'coordination', title: 'Джазовое остинато', duration: 240,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 3,
+        exercise: { kind: 'free',
+          notes: 'Ride: «1 — 2 и а 3 — 4 и а» (триолями). Хэт ногой на 2 и 4. Бочка тихо «фидером» на 1 и 3. Малый — соло по Stick Control.' } },
+      { type: 'song', title: 'Песня · в стиле Billie Jean', duration: 300, userPaced: true,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 4,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], snare: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], kick: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0] },
+          reference: 'В стиле Billie Jean (Michael Jackson) · ≈ 117 BPM',
+          notes: '16-е на хэте, ровно. Целевой 117.' } },
+      { type: 'song', title: 'Песня · в стиле Sunday Bloody Sunday', duration: 240, userPaced: true,
+        bpm: 95, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [1,0,1,0,1,0,1,0], kick: [1,0,0,0,0,0,1,0] },
+          reference: 'В стиле Sunday Bloody Sunday (U2) · ≈ 102 BPM',
+          notes: 'Маршевый снейр на каждой четверти. Целевой 102.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 120,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Свободно.' } },
+    ],
+  },
+  {
+    id: 'advanced-60', name: 'Продвинутый · 60 мин', difficulty: 'advanced', duration: 60,
+    blocks: [
+      { type: 'warmup', title: 'Разминка', duration: 420,
+        bpm: 85, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'R L R R  L R L L · lR R  rL L · R LL RR L · 8R 8L 4/4',
+          notes: '~2 мин парадиддл → ~2 мин flam tap → ~2 мин 6-stroke roll → ~1 мин пирамида.' } },
+      { type: 'rudiment', title: 'Flam Tap', duration: 480,
+        bpm: 90, bpmRamp: { to: 110, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'sticking', pattern: 'lR R   rL L', notes: 'Длинный прогон. Темп растёт сам.' } },
+      { type: 'rudiment', title: '6-stroke roll', duration: 480,
+        bpm: 100, bpmRamp: { to: 120, step: 5, every: 4 }, sig: { num: 4, den: 4 }, sub: 3,
+        exercise: { kind: 'sticking', pattern: 'R LL RR L  ·  R LL RR L',
+          notes: 'Деления — триоли. Акценты на одиночные, двойки тише.' } },
+      { type: 'coordination', title: 'Линейный + хэт ногой 2,4', duration: 420,
+        bpm: 95, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,0,1,0,1,0,1,0], snare: [0,1,0,0,0,1,0,0], kick: [0,0,0,1,0,0,0,1] },
+          notes: 'Хэт ногой на 2 и 4 (в сетке не показано).' } },
+      { type: 'coordination', title: 'Джазовое остинато', duration: 420,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 3,
+        exercise: { kind: 'free',
+          notes: 'Ride: «1 — 2 и а 3 — 4 и а». Хэт ногой 2 и 4. Малый — соло по Stick Control.' } },
+      { type: 'song', title: 'Песня · в стиле Billie Jean', duration: 360, userPaced: true,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 4,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], snare: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], kick: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0] },
+          reference: 'В стиле Billie Jean (Michael Jackson) · ≈ 117 BPM', notes: 'Целевой 117.' } },
+      { type: 'song', title: 'Песня · в стиле Sunday Bloody Sunday', duration: 360, userPaced: true,
+        bpm: 95, sig: { num: 4, den: 4 }, sub: 2,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1], snare: [1,0,1,0,1,0,1,0], kick: [1,0,0,0,0,0,1,0] },
+          reference: 'В стиле Sunday Bloody Sunday (U2) · ≈ 102 BPM', notes: 'Целевой 102.' } },
+      { type: 'song', title: 'Фанк с гост-нотами', duration: 360, userPaced: true,
+        bpm: 90, sig: { num: 4, den: 4 }, sub: 4,
+        exercise: { kind: 'groove',
+          grid: { hat: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], snare: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], kick: [1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0] },
+          notes: 'Базовый фанк-грув с гост-нотами на снейре между основными ударами. Гост-ноты тихо, акцент на 2 и 4.' } },
+      { type: 'cooldown', title: 'Заминка', duration: 300,
+        bpm: 100, sig: { num: 4, den: 4 }, sub: 1,
+        exercise: { kind: 'free', notes: 'Свободно.' } },
+    ],
+  },
+];
+
+const DIFFICULTY_LABELS = {
+  beginner: 'Начинающий',
+  intermediate: 'Средний',
+  advanced: 'Продвинутый',
+};
+
+const BLOCK_TYPE_LABELS = {
+  warmup: 'Разминка',
+  rudiment: 'Рудимент',
+  coordination: 'Координация',
+  song: 'Песня',
+  cooldown: 'Заминка',
+};
 
 // --- Theme ---
 
@@ -329,6 +723,7 @@ function rebuildBeatIndicator() {
 
   renderBeatStacks('beat-indicator');
   renderBeatStacks('flash-beat-indicator');
+  renderBeatStacks('runner-beat-indicator');
 }
 
 function renderBeatStacks(targetId) {
@@ -571,6 +966,12 @@ function updatePlayButton() {
     flashPlay.classList.toggle('playing', state.isPlaying);
     flashPlay.querySelector('.flash-play-icon').textContent = state.isPlaying ? '■' : '▶';
   }
+  // Sync the program runner's Start/Stop button
+  const runnerPlay = $('runner-play');
+  if (runnerPlay) {
+    runnerPlay.classList.toggle('playing', state.isPlaying);
+    runnerPlay.querySelector('.runner-play-icon').textContent = state.isPlaying ? '■' : '▶';
+  }
 }
 
 // --- Tap tempo ---
@@ -731,9 +1132,6 @@ function switchTab(tabId) {
   $('page-title').textContent = TAB_TITLES[tabId];
   // Re-evaluate active preset highlight when entering Settings
   if (tabId === 'settings') checkActivePresetStillMatches();
-  // Show "in development" notice every time the user opens Training (the tab
-  // is currently a placeholder; the modal will go away once content lands).
-  if (tabId === 'training') openModal('training-modal');
 }
 
 function openModal(id) {
@@ -891,8 +1289,24 @@ function bind() {
   $('flash-lamp').addEventListener('click', toggleLamp);
   $('flash-play').addEventListener('click', toggle);
 
-  // Training tab placeholder
-  $('training-ok').addEventListener('click', () => closeModal('training-modal'));
+  // Programs (training routines)
+  $('program-create').addEventListener('click', () => showToast('Эта функция пока не работает'));
+  $('program-import').addEventListener('click', () => showToast('Эта функция пока не работает'));
+  $('program-start').addEventListener('click', () => {
+    const id = $('program-start').dataset.programId;
+    if (id) startProgram(id);
+  });
+  $('runner-close').addEventListener('click', attemptCloseRunner);
+  $('runner-play').addEventListener('click', () => {
+    // If a transition card is up, dismiss it first so user sees the new block
+    if ($('runner-transition').classList.contains('open')) hideTransition();
+    toggle();
+  });
+  $('runner-skip').addEventListener('click', userSkipBlock);
+  $('runner-extend').addEventListener('click', userExtendBlock);
+  $('runner-done').addEventListener('click', userMarkDone);
+  $('runner-transition-go').addEventListener('click', hideTransition);
+  $('runner-finish-close').addEventListener('click', exitProgram);
 
   // Count-in (delayed start) — picking arms; the countdown itself fires
   // from start() when the user presses the main Start button.
@@ -1018,8 +1432,9 @@ function bind() {
       closeModal('time-modal');
       closeModal('presets-modal');
       closeModal('countin-modal');
-      closeModal('training-modal');
+      closeModal('program-preview-modal');
       if ($('flash-screen').classList.contains('open')) closeFlashScreen();
+      if ($('program-runner').classList.contains('open')) attemptCloseRunner();
     }
   });
 
@@ -1533,6 +1948,425 @@ function finishCountin() {
 
 function cancelCountin() { finishCountin(); }
 
+// --- Programs (training routines) ---
+//
+// A program is an ordered list of blocks. The runner pushes each block's
+// settings into the metronome (BPM/sig/sub + optional Speed Trainer ramp)
+// and counts down a per-block timer. Auto-timed blocks advance themselves;
+// userPaced blocks wait for "Готово, дальше". On exit we restore the
+// metronome state to what it was before the program started.
+
+const programState = {
+  active: false,
+  program: null,
+  blockIdx: 0,
+  blockTimeRemaining: 0,        // seconds left on auto-timed block
+  blockTickInterval: null,
+  saved: null,                  // metronome state snapshot for exit restore
+};
+
+function getProgramById(id) {
+  return PROGRAMS.find(p => p.id === id);
+}
+
+function totalProgramSeconds(p) {
+  return p.blocks.reduce((s, b) => s + (b.duration || 0), 0);
+}
+
+function formatMMSS(sec) {
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  const r = s - m * 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+function renderProgramTiles() {
+  const root = $('programs-list');
+  if (!root) return;
+  root.innerHTML = '';
+  const groups = ['beginner', 'intermediate', 'advanced'];
+  for (const diff of groups) {
+    const items = PROGRAMS
+      .filter(p => p.difficulty === diff)
+      .sort((a, b) => a.duration - b.duration);
+    if (!items.length) continue;
+    const group = document.createElement('div');
+    group.className = 'program-group';
+    const h = document.createElement('h3');
+    h.className = 'program-group-title';
+    h.textContent = DIFFICULTY_LABELS[diff];
+    group.appendChild(h);
+    const tiles = document.createElement('div');
+    tiles.className = 'program-tiles';
+    items.forEach(p => {
+      const b = document.createElement('button');
+      b.className = 'program-tile';
+      b.dataset.programId = p.id;
+      b.innerHTML = `
+        <span class="program-tile-duration">${p.duration} мин</span>
+        <span class="program-tile-blocks">${p.blocks.length} блоков</span>
+      `;
+      b.addEventListener('click', () => openProgramPreview(p.id));
+      tiles.appendChild(b);
+    });
+    group.appendChild(tiles);
+    root.appendChild(group);
+  }
+}
+
+function openProgramPreview(id) {
+  const p = getProgramById(id);
+  if (!p) return;
+  $('program-preview-title').textContent = p.name;
+  const totalMin = Math.round(totalProgramSeconds(p) / 60);
+  $('program-preview-meta').textContent = `${p.blocks.length} блоков · итого ≈ ${totalMin} мин`;
+  const list = $('program-preview-blocks');
+  list.innerHTML = '';
+  p.blocks.forEach(block => {
+    const li = document.createElement('li');
+    li.className = 'program-preview-block';
+    const min = Math.round((block.duration || 0) / 60);
+    const minTxt = block.userPaced ? `≈ ${min} мин` : `${min} мин`;
+    const ramp = block.bpmRamp ? `${block.bpm}→${block.bpmRamp.to}` : `${block.bpm}`;
+    li.innerHTML = `
+      <span class="program-preview-block-type">${BLOCK_TYPE_LABELS[block.type] || ''}</span>
+      <span class="program-preview-block-title">${block.title}</span>
+      <span class="program-preview-block-meta">${minTxt} · ${ramp} BPM</span>
+    `;
+    list.appendChild(li);
+  });
+  $('program-start').dataset.programId = id;
+  openModal('program-preview-modal');
+}
+
+function startProgram(id) {
+  const p = getProgramById(id);
+  if (!p) return;
+  if (state.isPlaying) stop();
+  // Snapshot metronome state so we can restore on exit
+  programState.saved = {
+    bpm: state.bpm,
+    num: state.beatsPerMeasure,
+    den: state.beatUnit,
+    sub: state.subdivision,
+    beatTypes: state.beatTypes.slice(),
+    trainerEnabled: state.trainerEnabled,
+    trainerStart: state.trainerStart,
+    trainerEnd: state.trainerEnd,
+    trainerStep: state.trainerStep,
+    trainerBars: state.trainerBars,
+    activePresetSig: state.activePresetSig,
+  };
+  programState.active = true;
+  programState.program = p;
+  programState.blockIdx = 0;
+  state.activePresetSig = null;  // programs override metronome state, drop preset highlight
+  closeModal('program-preview-modal');
+  openRunner();
+  loadBlock(0);
+  startBlockTicker();
+}
+
+function openRunner() {
+  $('runner-program-name').textContent = programState.program.name;
+  const el = $('program-runner');
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+}
+
+function closeRunnerNow() {
+  const el = $('program-runner');
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+  hideTransition();
+  hideFinish();
+}
+
+function exitProgram() {
+  if (state.isPlaying) stop();
+  stopBlockTicker();
+  if (programState.saved) {
+    const s = programState.saved;
+    setBpm(s.bpm);
+    state.beatsPerMeasure = s.num;
+    state.beatUnit = s.den;
+    state.subdivision = s.sub;
+    state.beatTypes = s.beatTypes.slice();
+    state.trainerEnabled = s.trainerEnabled;
+    state.trainerStart = s.trainerStart;
+    state.trainerEnd = s.trainerEnd;
+    state.trainerStep = s.trainerStep;
+    state.trainerBars = s.trainerBars;
+    state.activePresetSig = s.activePresetSig;
+    // Sync the trainer UI on the Training tab so what user sees matches state
+    const tOn = $('trainer-on');
+    if (tOn) tOn.checked = state.trainerEnabled;
+    const tStart = $('trainer-start'); if (tStart) tStart.value = state.trainerStart;
+    const tEnd   = $('trainer-end');   if (tEnd)   tEnd.value   = state.trainerEnd;
+    const tStep  = $('trainer-step');  if (tStep)  tStep.value  = state.trainerStep;
+    const tBars  = $('trainer-bars');  if (tBars)  tBars.value  = state.trainerBars;
+    rebuildBeatIndicator();
+    updateSubDisplay();
+    updateTimeDisplay();
+    renderActiveTrainers();
+  }
+  programState.active = false;
+  programState.program = null;
+  programState.saved = null;
+  closeRunnerNow();
+}
+
+function loadBlock(idx) {
+  const block = programState.program.blocks[idx];
+  if (!block) return;
+  programState.blockIdx = idx;
+  programState.blockTimeRemaining = block.duration || 0;
+
+  // Push block params into metronome (without starting playback)
+  setBpm(block.bpm);
+  state.beatsPerMeasure = block.sig.num;
+  state.beatUnit = block.sig.den;
+  state.subdivision = block.sub;
+  state.currentBeat = 0;
+  state.currentSub = 0;
+  // Reset beat types so first beat is accent and rest are plain — programs
+  // shouldn't inherit user's per-beat customizations from before
+  state.beatTypes = Array(block.sig.num).fill('beat');
+  state.beatTypes[0] = 'accent';
+  rebuildBeatIndicator();
+  updateSubDisplay();
+  updateTimeDisplay();
+
+  // BPM ramp drives the existing Speed Trainer plumbing
+  if (block.bpmRamp) {
+    state.trainerEnabled = true;
+    state.trainerStart = block.bpm;
+    state.trainerEnd = block.bpmRamp.to;
+    state.trainerStep = block.bpmRamp.step;
+    state.trainerBars = block.bpmRamp.every;
+  } else {
+    state.trainerEnabled = false;
+  }
+  state.trainerBarCount = 0;
+
+  renderRunnerBlock(block);
+}
+
+function renderRunnerBlock(block) {
+  $('runner-block-type').textContent = BLOCK_TYPE_LABELS[block.type] || '';
+  $('runner-block-title').textContent = block.title;
+  $('runner-block-pos').textContent =
+    `Блок ${programState.blockIdx + 1} / ${programState.program.blocks.length}`;
+  $('runner-bpm').textContent = block.bpmRamp ? `${block.bpm} → ${block.bpmRamp.to}` : block.bpm;
+  $('runner-sig').textContent = `${block.sig.num}/${block.sig.den}`;
+  $('runner-sub').textContent = SUB_META[block.sub]?.symbol || '♩';
+
+  const ex = block.exercise || {};
+  const exEl = $('runner-exercise');
+  exEl.innerHTML = '';
+  exEl.dataset.kind = ex.kind || 'free';
+  if (ex.kind === 'sticking' && ex.pattern) {
+    const p = document.createElement('div');
+    p.className = 'runner-sticking';
+    p.textContent = ex.pattern;
+    exEl.appendChild(p);
+  } else if (ex.kind === 'groove' && ex.grid) {
+    exEl.appendChild(buildGrooveGrid(ex.grid));
+  }
+
+  const ref = $('runner-reference');
+  ref.textContent = ex.reference || '';
+  ref.hidden = !ex.reference;
+  $('runner-notes').textContent = ex.notes || '';
+
+  const done = $('runner-done');
+  const timer = $('runner-timer');
+  const extend = $('runner-extend');
+  if (block.userPaced) {
+    done.hidden = false;
+    extend.disabled = true;
+    timer.textContent = block.duration ? `≈ ${formatMMSS(block.duration)}` : '—';
+    timer.dataset.userPaced = 'true';
+  } else {
+    done.hidden = true;
+    extend.disabled = false;
+    timer.dataset.userPaced = 'false';
+    updateRunnerTimerUI();
+  }
+  updateRunnerProgressUI();
+  // Reflect current metronome play state on the runner play button
+  if (typeof updatePlayButton === 'function') updatePlayButton();
+}
+
+function buildGrooveGrid(grid) {
+  const wrap = document.createElement('div');
+  wrap.className = 'groove-grid';
+  const rows = [
+    { key: 'hat',   label: 'хэт',   marker: '×' },
+    { key: 'snare', label: 'мал.',  marker: '●' },
+    { key: 'kick',  label: 'бочка', marker: '●' },
+  ];
+  // Cell count = length of the first non-empty row (typically 8 or 16 in 4/4)
+  let cells = 8;
+  for (const r of rows) {
+    if (Array.isArray(grid[r.key])) { cells = grid[r.key].length; break; }
+  }
+  wrap.style.setProperty('--cells', cells);
+  // Highlight every Nth cell as a "beat" — assumes 4 beats/bar (cells/4 cells per beat)
+  const cellsPerBeat = Math.max(1, Math.round(cells / 4));
+  for (const r of rows) {
+    const arr = grid[r.key];
+    if (!Array.isArray(arr)) continue;
+    const row = document.createElement('div');
+    row.className = 'groove-row';
+    row.dataset.row = r.key;
+    const lbl = document.createElement('div');
+    lbl.className = 'groove-label';
+    lbl.textContent = r.label;
+    row.appendChild(lbl);
+    for (let i = 0; i < cells; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'groove-cell';
+      if (i % cellsPerBeat === 0) cell.classList.add('beat');
+      if (arr[i]) {
+        cell.classList.add('hit');
+        cell.textContent = r.marker;
+      }
+      row.appendChild(cell);
+    }
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function updateRunnerTimerUI() {
+  const block = programState.program?.blocks[programState.blockIdx];
+  if (!block || block.userPaced) return;
+  $('runner-timer').textContent = formatMMSS(programState.blockTimeRemaining);
+}
+
+function updateRunnerProgressUI() {
+  const block = programState.program?.blocks[programState.blockIdx];
+  const fill = $('runner-progress-fill');
+  if (!fill) return;
+  if (!block || block.userPaced || !block.duration) {
+    fill.style.width = '0%';
+    return;
+  }
+  const elapsed = block.duration - programState.blockTimeRemaining;
+  const pct = Math.max(0, Math.min(100, (elapsed / block.duration) * 100));
+  fill.style.width = pct + '%';
+}
+
+// Ticks once per second while the runner is open. Only decrements time when
+// the metronome is actually playing — pause = stop the metronome, and the
+// block timer freezes automatically (single source of truth: state.isPlaying).
+function startBlockTicker() {
+  stopBlockTicker();
+  programState.blockTickInterval = setInterval(() => {
+    if (!programState.active) return;
+    if (!state.isPlaying) return;
+    const block = programState.program.blocks[programState.blockIdx];
+    if (!block || block.userPaced) return;
+    programState.blockTimeRemaining--;
+    if (programState.blockTimeRemaining <= 0) {
+      programState.blockTimeRemaining = 0;
+      updateRunnerTimerUI();
+      updateRunnerProgressUI();
+      onBlockComplete();
+    } else {
+      updateRunnerTimerUI();
+      updateRunnerProgressUI();
+    }
+  }, 1000);
+}
+
+function stopBlockTicker() {
+  if (programState.blockTickInterval) {
+    clearInterval(programState.blockTickInterval);
+    programState.blockTickInterval = null;
+  }
+}
+
+function onBlockComplete() {
+  if (state.isPlaying) stop();
+  const nextIdx = programState.blockIdx + 1;
+  if (nextIdx >= programState.program.blocks.length) {
+    showFinish();
+  } else {
+    showTransition(nextIdx);
+  }
+}
+
+// Transition overlay — shown briefly between blocks. We pre-load the next
+// block underneath so when user taps "Поехали", the play button is ready
+// and the metronome is already configured for the new BPM/sig/sub.
+function showTransition(nextIdx) {
+  const next = programState.program.blocks[nextIdx];
+  $('runner-transition-prefix').textContent =
+    `Следующий блок · ${nextIdx + 1} / ${programState.program.blocks.length}`;
+  $('runner-transition-title').textContent = next.title;
+  const min = Math.round((next.duration || 0) / 60);
+  const ramp = next.bpmRamp ? `${next.bpm}→${next.bpmRamp.to}` : `${next.bpm}`;
+  const minTxt = next.userPaced ? `≈ ${min} мин` : `${min} мин`;
+  $('runner-transition-meta').textContent = `${minTxt} · ${ramp} BPM`;
+  loadBlock(nextIdx);
+  const el = $('runner-transition');
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+}
+
+function hideTransition() {
+  const el = $('runner-transition');
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+}
+
+function showFinish() {
+  $('runner-finish-meta').textContent =
+    `${programState.program.name} · ${programState.program.blocks.length} блоков`;
+  const el = $('runner-finish');
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+}
+
+function hideFinish() {
+  const el = $('runner-finish');
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+}
+
+function userSkipBlock() {
+  if (!programState.active) return;
+  onBlockComplete();
+}
+
+function userExtendBlock() {
+  if (!programState.active) return;
+  const block = programState.program.blocks[programState.blockIdx];
+  if (!block || block.userPaced) return;
+  programState.blockTimeRemaining += 120;
+  // Grow the denominator too so the progress bar doesn't snap/overshoot
+  block.duration += 120;
+  updateRunnerTimerUI();
+  updateRunnerProgressUI();
+}
+
+function userMarkDone() {
+  if (!programState.active) return;
+  const block = programState.program.blocks[programState.blockIdx];
+  if (!block || !block.userPaced) return;
+  onBlockComplete();
+}
+
+function attemptCloseRunner() {
+  if (!programState.active) { closeRunnerNow(); return; }
+  // Pause the metronome before showing the dialog — playing through the
+  // confirm prompt would be jarring.
+  if (state.isPlaying) stop();
+  if (confirm('Прервать программу?')) exitProgram();
+}
+
 // --- Init ---
 
 function init() {
@@ -1562,6 +2396,7 @@ function init() {
   rebuildBeatIndicator();
   renderBuiltinPresets();
   renderUserPresets();
+  renderProgramTiles();
   updateSubDisplay();
   updateTimeDisplay();
   updatePlayButton();
