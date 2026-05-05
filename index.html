@@ -132,7 +132,21 @@
       <section class="tab-view" id="tab-training" data-tab="training">
         <div class="tab-section">
           <h2 class="tab-section-title">Программы тренировок</h2>
-          <div id="programs-list" class="programs-list"></div>
+          <div class="programs-picker">
+            <button class="programs-picker-btn" id="program-difficulty-btn">
+              <span class="programs-picker-text" id="program-difficulty-text">Сложность</span>
+              <svg class="programs-picker-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            <button class="programs-picker-btn" id="program-duration-btn">
+              <span class="programs-picker-text" id="program-duration-text">Длительность</span>
+              <svg class="programs-picker-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            <button class="programs-picker-next is-disabled" id="program-next">Далее</button>
+          </div>
           <div class="programs-actions">
             <button class="program-action-btn" id="program-create">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
@@ -436,6 +450,34 @@
     <div class="countin-num" id="countin-num">5</div>
   </div>
 
+  <!-- Program difficulty picker — opens by tapping the Сложность button -->
+  <div id="program-difficulty-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Сложность</h3>
+      <div class="program-picker-options">
+        <button class="program-picker-option" data-difficulty="beginner">Начальный</button>
+        <button class="program-picker-option" data-difficulty="intermediate">Средний</button>
+        <button class="program-picker-option" data-difficulty="advanced">Профи</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Program duration picker — opens by tapping the Длительность button -->
+  <div id="program-duration-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Длительность</h3>
+      <div class="program-picker-options">
+        <button class="program-picker-option" data-duration="15">15 минут</button>
+        <button class="program-picker-option" data-duration="30">30 минут</button>
+        <button class="program-picker-option" data-duration="60">60 минут</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Program preview sheet — shown when user taps a program tile -->
   <div id="program-preview-modal" class="modal" aria-hidden="true">
     <div class="modal-backdrop" data-close></div>
@@ -526,18 +568,13 @@
        left to view it horizontally. -->
   <div id="rhythm-editor" class="rhythm-editor" aria-hidden="true">
     <aside class="rhythm-meta">
-      <button class="rhythm-icon-btn" id="rhythm-presets-btn" aria-label="Сохранённые ритмы">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-        </svg>
-      </button>
       <div class="rhythm-meta-item rhythm-bpm-stepper">
         <button class="rhythm-bpm-arrow" id="rhythm-bpm-up" aria-label="+1 BPM">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 15 12 9 18 15"/>
           </svg>
         </button>
-        <input id="rhythm-bpm" type="number" min="30" max="320" value="100" inputmode="numeric">
+        <div id="rhythm-bpm" class="rhythm-bpm-value">100</div>
         <button class="rhythm-bpm-arrow" id="rhythm-bpm-down" aria-label="−1 BPM">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
@@ -545,14 +582,14 @@
         </button>
         <span class="rhythm-meta-label">BPM</span>
       </div>
-      <div class="rhythm-meta-item">
-        <span class="rhythm-meta-value">4/4</span>
+      <button class="rhythm-meta-item rhythm-meta-button" id="rhythm-size-btn" aria-label="Изменить размер">
+        <span class="rhythm-meta-value" id="rhythm-size-value">4/4</span>
         <span class="rhythm-meta-label">размер</span>
-      </div>
-      <div class="rhythm-meta-item">
-        <span class="rhythm-meta-value rhythm-meta-value-symbol">♩</span>
+      </button>
+      <button class="rhythm-meta-item rhythm-meta-button" id="rhythm-division-btn" aria-label="Изменить деления">
+        <span class="rhythm-meta-value rhythm-meta-value-symbol" id="rhythm-division-value">♬</span>
         <span class="rhythm-meta-label">деления</span>
-      </div>
+      </button>
     </aside>
 
     <main class="rhythm-editor-body">
@@ -560,14 +597,10 @@
     </main>
 
     <aside class="rhythm-actions">
-      <button class="rhythm-icon-btn" id="rhythm-clear" aria-label="Очистить">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"/>
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <button class="rhythm-icon-btn" id="rhythm-editor-close" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
         </svg>
-      </button>
-      <button class="rhythm-play-btn" id="rhythm-play" aria-label="Воспроизведение">
-        <span class="rhythm-play-icon">▶</span>
       </button>
       <button class="rhythm-icon-btn rhythm-mode-btn" id="rhythm-mode" aria-label="Звуки ударов" aria-pressed="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -576,12 +609,56 @@
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
         </svg>
       </button>
-      <button class="rhythm-icon-btn" id="rhythm-editor-close" aria-label="Закрыть">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+      <button class="rhythm-play-btn" id="rhythm-play" aria-label="Воспроизведение">
+        <span class="rhythm-play-icon">▶</span>
+      </button>
+      <button class="rhythm-icon-btn" id="rhythm-presets-btn" aria-label="Сохранённые ритмы">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
+      <button class="rhythm-icon-btn" id="rhythm-clear" aria-label="Очистить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
         </svg>
       </button>
     </aside>
+  </div>
+
+  <!-- Time signature picker — opens by tapping the "размер" item in
+       the editor's meta column. -->
+  <div id="rhythm-size-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Размер такта</h3>
+      <div class="rhythm-meter-options" id="rhythm-size-options"></div>
+    </div>
+  </div>
+
+  <!-- Subdivision picker — opens by tapping the "деления" item. -->
+  <div id="rhythm-division-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Деления</h3>
+      <div class="rhythm-division-options" id="rhythm-division-options"></div>
+    </div>
+  </div>
+
+  <!-- Confirmation sheet shown when a meter/division change would
+       discard existing hits. -->
+  <div id="rhythm-confirm-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <p class="rhythm-confirm-text" id="rhythm-confirm-text"></p>
+      <div class="rhythm-confirm-actions">
+        <button class="rhythm-confirm-cancel" id="rhythm-confirm-cancel">Отмена</button>
+        <button class="rhythm-confirm-ok" id="rhythm-confirm-ok">Изменить</button>
+      </div>
+    </div>
   </div>
 
   <!-- Saved rhythms sheet — opens via the bookmark icon in the editor.

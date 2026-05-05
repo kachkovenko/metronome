@@ -1056,49 +1056,96 @@ details > *:last-child { padding-bottom: 16px; }
 }
 
 /* Programs (training) */
-.programs-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.program-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.program-group-title {
-  margin: 0 4px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.program-tiles {
+/* Difficulty + duration pickers and the "Далее" button. Three columns,
+   the first two flex (so labels can grow on long values like
+   "Продвинутый") and "Далее" sits on the right at intrinsic width. */
+.programs-picker {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr auto;
   gap: 8px;
 }
 
-.program-tile {
+.programs-picker-btn {
   background: var(--card);
   color: var(--fg);
-  border: 2px solid transparent;
+  border: none;
   border-radius: var(--radius-md);
-  padding: 14px 10px;
+  padding: 14px 12px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  gap: 6px;
   font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.06s ease;
+  transition: background 0.15s ease, transform 0.06s ease;
 }
 
-.program-tile:active { transform: scale(0.97); background: var(--card-2); }
-.program-tile-duration { font-size: 17px; font-weight: 700; color: var(--accent-text); }
-.program-tile-blocks { font-size: 11px; color: var(--muted); letter-spacing: 0.02em; }
+.programs-picker-btn:active { transform: scale(0.97); background: var(--card-2); }
+
+.programs-picker-text {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.programs-picker-text.is-filled { color: var(--fg); }
+
+.programs-picker-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.programs-picker-next {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.06s ease, opacity 0.15s ease;
+}
+
+.programs-picker-next:active:not(.is-disabled) { transform: scale(0.97); }
+
+/* Visually disabled but still clickable — the click handler shows a
+   toast instead of being blocked by the `disabled` attribute. */
+.programs-picker-next.is-disabled {
+  background: var(--card);
+  color: var(--muted);
+}
+
+/* Difficulty/duration option list inside the bottom sheet — same look
+   as the count-in / rhythm pickers. */
+.program-picker-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.program-picker-option {
+  padding: 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--card-2);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.program-picker-option:active { transform: scale(0.97); background: var(--card-3); }
+.program-picker-option.is-active { background: var(--accent); color: #000; }
 
 .programs-actions {
   display: grid;
@@ -1754,6 +1801,24 @@ details > *:last-child { padding-bottom: 16px; }
   min-width: 56px;
 }
 
+/* Tappable meta items (size + division). Same visual presentation as
+   the BPM stepper — just text — but with a subtle press feedback so
+   they read as actionable. */
+.rhythm-meta-button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+.rhythm-meta-button:active {
+  background: var(--card-2);
+  transform: scale(0.97);
+}
+
 .rhythm-meta-value {
   font-size: 22px;
   font-weight: 700;
@@ -1794,25 +1859,20 @@ details > *:last-child { padding-bottom: 16px; }
 
 #rhythm-bpm {
   width: 64px;
-  background: transparent;
   color: var(--fg);
-  border: none;
   text-align: center;
-  font-family: inherit;
   font-size: 22px;
   font-weight: 700;
-  outline: none;
   font-variant-numeric: tabular-nums;
-  padding: 0;
   line-height: 1.1;
   letter-spacing: -0.01em;
-  -moz-appearance: textfield;
-}
-
-#rhythm-bpm::-webkit-outer-spin-button,
-#rhythm-bpm::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Drag-to-change BPM gesture: prevent the OS from interpreting the
+     finger motion as a scroll/pan, otherwise pointermove never fires
+     consistently. */
+  touch-action: none;
+  cursor: ns-resize;
 }
 
 /* === Middle column: grid === */
@@ -1824,13 +1884,11 @@ details > *:last-child { padding-bottom: 16px; }
   z-index: 2;
 }
 
-/* 7 voice rows × 16 time cells, with the voice label in the auto column
-   on the left. Both cell columns and voice rows use 1fr so cells stretch
-   to fill the available landscape width and height (no overflow, no
-   scroll). */
+/* 7 voice rows × N time cells, with the voice label in the auto column
+   on the left. The cell count (and `grid-template-columns`) is set
+   inline by buildRhythmGrid() since N depends on beats × division. */
 .rhythm-grid {
   display: grid;
-  grid-template-columns: auto repeat(16, 1fr);
   grid-template-rows: repeat(7, 1fr);
   gap: 4px;
   width: 100%;
@@ -1909,6 +1967,27 @@ details > *:last-child { padding-bottom: 16px; }
       max(16px, env(safe-area-inset-bottom))
       max(16px, env(safe-area-inset-left))
       max(16px, env(safe-area-inset-top));
+  }
+
+  /* When the editor is open and a modal opens on top of it, rotate the
+     modal too — same trick as the editor. The body class is toggled in
+     openRhythmEditor / closeRhythmEditor. The sheet inside the modal
+     stays anchored to the modal's bottom, which after rotation lands at
+     the user's perceived bottom (i.e. the phone's left edge). */
+  body.rhythm-editor-open .modal.open {
+    width: 100dvh;
+    height: 100dvw;
+    transform: rotate(90deg);
+    transform-origin: 50dvmin 50dvmin;
+  }
+
+  /* The rotated sheet's horizontal axis maps to the phone's vertical
+     axis, so the notch / Dynamic Island sits on the sheet's LEFT and
+     the home indicator on the RIGHT. Pad both sides to clear them,
+     otherwise the start of long text gets eaten by the notch. */
+  body.rhythm-editor-open .modal.open .sheet {
+    padding-left: max(24px, env(safe-area-inset-top));
+    padding-right: max(24px, env(safe-area-inset-bottom));
   }
 }
 
@@ -2049,11 +2128,10 @@ details > *:last-child { padding-bottom: 16px; }
 [data-theme="light"] .beat-card,
 [data-theme="light"] details,
 [data-theme="light"] .program-action-btn,
-[data-theme="light"] .program-tile {
+[data-theme="light"] .programs-picker-btn {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-[data-theme="light"] .program-tile-duration { color: var(--accent-text); }
 [data-theme="light"] .runner-block-type { color: var(--accent-text); }
 [data-theme="light"] .groove-cell.hit { color: #000; }
 [data-theme="light"] .program-start-btn,
@@ -2325,6 +2403,108 @@ details > *:last-child { padding-bottom: 16px; }
 /* Odd 5th option ("Без задержки") sits alone on the last grid row —
    span both columns so it doesn't look orphaned next to empty space. */
 .countin-options .countin-option:nth-child(5) { grid-column: 1 / -1; }
+
+/* The rhythm editor sits at z-index 130; its picker/confirm modals must
+   stack above it so the sheets aren't hidden behind the editor. */
+#rhythm-size-modal,
+#rhythm-division-modal,
+#rhythm-confirm-modal,
+#rhythms-modal {
+  z-index: 140;
+}
+
+/* === Rhythm meter & division pickers === */
+.rhythm-meter-options,
+.rhythm-division-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.rhythm-meter-option,
+.rhythm-division-option {
+  padding: 18px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--card-2);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.rhythm-meter-option:active,
+.rhythm-division-option:active {
+  transform: scale(0.97);
+  background: var(--card-3);
+}
+
+.rhythm-meter-option.is-active,
+.rhythm-division-option.is-active {
+  background: var(--accent);
+  color: #000;
+}
+
+.rhythm-division-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.rhythm-division-glyph {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.rhythm-division-name {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+/* === Rhythm change-confirmation sheet === */
+.rhythm-confirm-text {
+  margin: 8px 0 16px;
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.rhythm-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.rhythm-confirm-cancel,
+.rhythm-confirm-ok {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.rhythm-confirm-cancel {
+  background: var(--card-2);
+  color: var(--fg);
+}
+
+.rhythm-confirm-ok {
+  background: #e64a4a;
+  color: #fff;
+}
+
+.rhythm-confirm-cancel:active,
+.rhythm-confirm-ok:active { transform: scale(0.97); }
 
 /* === Count-in countdown overlay === */
 .countin-overlay {

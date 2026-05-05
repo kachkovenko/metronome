@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.18.0';
+const APP_VERSION = '1.19.0';
 
 const state = {
   bpm: 100,
@@ -132,7 +132,7 @@ const BUILTIN_PRESETS = [
 const PROGRAMS = [
   // === Beginner ===
   {
-    id: 'beginner-15', name: 'Начинающий · 15 мин', difficulty: 'beginner', duration: 15,
+    id: 'beginner-15', name: 'Начальный · 15 мин', difficulty: 'beginner', duration: 15,
     blocks: [
       { type: 'warmup', title: 'Разминка · одиночные', duration: 120,
         bpm: 60, sig: { num: 4, den: 4 }, sub: 2,
@@ -159,7 +159,7 @@ const PROGRAMS = [
     ],
   },
   {
-    id: 'beginner-30', name: 'Начинающий · 30 мин', difficulty: 'beginner', duration: 30,
+    id: 'beginner-30', name: 'Начальный · 30 мин', difficulty: 'beginner', duration: 30,
     description: 'Обе песни идут на одном базовом рок-битe — это тренировка удержания грува при росте темпа: ≈87 → ≈124 BPM.',
     blocks: [
       { type: 'warmup', title: 'Разминка · одиночные', duration: 120,
@@ -206,7 +206,7 @@ const PROGRAMS = [
     ],
   },
   {
-    id: 'beginner-60', name: 'Начинающий · 60 мин', difficulty: 'beginner', duration: 60,
+    id: 'beginner-60', name: 'Начальный · 60 мин', difficulty: 'beginner', duration: 60,
     description: 'Все три песни идут на одном базовом рок-битe — фокус на удержании грува при росте темпа: ≈87 → ≈110 → ≈124 BPM.',
     blocks: [
       { type: 'warmup', title: 'Разминка · одиночные', duration: 180,
@@ -384,7 +384,7 @@ const PROGRAMS = [
 
   // === Advanced ===
   {
-    id: 'advanced-15', name: 'Продвинутый · 15 мин', difficulty: 'advanced', duration: 15,
+    id: 'advanced-15', name: 'Профи · 15 мин', difficulty: 'advanced', duration: 15,
     blocks: [
       { type: 'warmup', title: 'Разминка', duration: 120,
         bpm: 90, sig: { num: 4, den: 4 }, sub: 2,
@@ -411,7 +411,7 @@ const PROGRAMS = [
     ],
   },
   {
-    id: 'advanced-30', name: 'Продвинутый · 30 мин', difficulty: 'advanced', duration: 30,
+    id: 'advanced-30', name: 'Профи · 30 мин', difficulty: 'advanced', duration: 30,
     blocks: [
       { type: 'warmup', title: 'Разминка', duration: 240,
         bpm: 90, sig: { num: 4, den: 4 }, sub: 2,
@@ -448,7 +448,7 @@ const PROGRAMS = [
     ],
   },
   {
-    id: 'advanced-60', name: 'Продвинутый · 60 мин', difficulty: 'advanced', duration: 60,
+    id: 'advanced-60', name: 'Профи · 60 мин', difficulty: 'advanced', duration: 60,
     blocks: [
       { type: 'warmup', title: 'Разминка', duration: 420,
         bpm: 85, sig: { num: 4, den: 4 }, sub: 2,
@@ -493,9 +493,9 @@ const PROGRAMS = [
 ];
 
 const DIFFICULTY_LABELS = {
-  beginner: 'Начинающий',
+  beginner: 'Начальный',
   intermediate: 'Средний',
-  advanced: 'Продвинутый',
+  advanced: 'Профи',
 };
 
 const BLOCK_TYPE_LABELS = {
@@ -1294,6 +1294,32 @@ function bind() {
   // Programs
   $('program-create').addEventListener('click', () => showToast('Эта функция пока не работает'));
   $('program-import').addEventListener('click', () => showToast('Эта функция пока не работает'));
+  $('program-difficulty-btn').addEventListener('click', openProgramDifficultySheet);
+  $('program-duration-btn').addEventListener('click', openProgramDurationSheet);
+  document.querySelectorAll('#program-difficulty-modal .program-picker-option').forEach(b => {
+    b.addEventListener('click', () => {
+      programPicker.difficulty = b.dataset.difficulty;
+      syncProgramPickerUI();
+      closeModal('program-difficulty-modal');
+    });
+  });
+  document.querySelectorAll('#program-duration-modal .program-picker-option').forEach(b => {
+    b.addEventListener('click', () => {
+      programPicker.duration = Number(b.dataset.duration);
+      syncProgramPickerUI();
+      closeModal('program-duration-modal');
+    });
+  });
+  $('program-next').addEventListener('click', () => {
+    if (!programPicker.difficulty && !programPicker.duration) {
+      showToast('Выберите сложность и длительность');
+      return;
+    }
+    if (!programPicker.difficulty) { showToast('Выберите сложность'); return; }
+    if (!programPicker.duration)   { showToast('Выберите длительность'); return; }
+    const p = PROGRAMS.find(x => x.difficulty === programPicker.difficulty && x.duration === programPicker.duration);
+    if (p) openProgramPreview(p.id);
+  });
   $('program-start').addEventListener('click', () => {
     const id = $('program-start').dataset.programId;
     if (id) startProgram(id);
@@ -1324,14 +1350,10 @@ function bind() {
   const adjustRhythmBpm = (delta) => {
     const next = Math.max(30, Math.min(320, (editorState.bpm || 100) + delta));
     editorState.bpm = next;
-    $('rhythm-bpm').value = next;
+    $('rhythm-bpm').textContent = next;
   };
   $('rhythm-bpm-up').addEventListener('click', () => adjustRhythmBpm(+1));
   $('rhythm-bpm-down').addEventListener('click', () => adjustRhythmBpm(-1));
-  $('rhythm-bpm').addEventListener('change', e => {
-    editorState.bpm = Math.max(30, Math.min(320, Number(e.target.value) || 100));
-    e.target.value = editorState.bpm;
-  });
   // Mouse wheel / touchpad scroll on the BPM number changes the value.
   // Up scroll = +1, down scroll = -1. preventDefault so the page doesn't
   // also scroll behind the editor.
@@ -1339,8 +1361,51 @@ function bind() {
     e.preventDefault();
     adjustRhythmBpm(e.deltaY < 0 ? +1 : -1);
   }, { passive: false });
+
+  // Drag-to-change BPM: press the number and slide finger up (in the
+  // user's perceived view) to raise BPM, slide down to lower it. When
+  // the editor is rotated for portrait phones, the user-perceived
+  // vertical axis is the screen's HORIZONTAL axis, so we read clientX.
+  // 5px of finger travel = 1 BPM step.
+  let bpmDragStart = null;
+  const PIXELS_PER_BPM = 5;
+  const isEditorRotated = () => document.body.classList.contains('rhythm-editor-open')
+    && window.matchMedia('(orientation: portrait) and (pointer: coarse), (orientation: portrait) and (max-width: 900px)').matches;
+  // In rotated mode, finger-up = phone-right = clientX increases. In
+  // unrotated mode, finger-up = clientY decreases. Normalize to a
+  // single "up = increasing" coordinate.
+  const dragCoord = (e) => isEditorRotated() ? e.clientX : -e.clientY;
+  $('rhythm-bpm').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    bpmDragStart = { coord: dragCoord(e), bpm: editorState.bpm || 100 };
+    e.target.setPointerCapture(e.pointerId);
+  });
+  $('rhythm-bpm').addEventListener('pointermove', (e) => {
+    if (!bpmDragStart) return;
+    const delta = dragCoord(e) - bpmDragStart.coord;
+    const next = Math.max(30, Math.min(320, bpmDragStart.bpm + Math.round(delta / PIXELS_PER_BPM)));
+    if (next !== editorState.bpm) {
+      editorState.bpm = next;
+      $('rhythm-bpm').textContent = next;
+    }
+  });
+  const endBpmDrag = () => { bpmDragStart = null; };
+  $('rhythm-bpm').addEventListener('pointerup', endBpmDrag);
+  $('rhythm-bpm').addEventListener('pointercancel', endBpmDrag);
   $('rhythm-save-name').addEventListener('change', e => {
     editorState.name = e.target.value.trim();
+  });
+  $('rhythm-size-btn').addEventListener('click', openRhythmSizeSheet);
+  $('rhythm-division-btn').addEventListener('click', openRhythmDivisionSheet);
+  $('rhythm-confirm-cancel').addEventListener('click', () => {
+    pendingMeterChange = null;
+    closeModal('rhythm-confirm-modal');
+  });
+  $('rhythm-confirm-ok').addEventListener('click', () => {
+    const fn = pendingMeterChange;
+    pendingMeterChange = null;
+    closeModal('rhythm-confirm-modal');
+    if (fn) fn();
   });
 
   // Count-in (delayed start) — picking arms; the countdown itself fires
@@ -2015,38 +2080,56 @@ function formatMMSS(sec) {
   return `${m}:${String(r).padStart(2, '0')}`;
 }
 
-function renderProgramTiles() {
-  const root = $('programs-list');
-  if (!root) return;
-  root.innerHTML = '';
-  const groups = ['beginner', 'intermediate', 'advanced'];
-  for (const diff of groups) {
-    const items = PROGRAMS
-      .filter(p => p.difficulty === diff)
-      .sort((a, b) => a.duration - b.duration);
-    if (!items.length) continue;
-    const group = document.createElement('div');
-    group.className = 'program-group';
-    const h = document.createElement('h3');
-    h.className = 'program-group-title';
-    h.textContent = DIFFICULTY_LABELS[diff];
-    group.appendChild(h);
-    const tiles = document.createElement('div');
-    tiles.className = 'program-tiles';
-    items.forEach(p => {
-      const b = document.createElement('button');
-      b.className = 'program-tile';
-      b.dataset.programId = p.id;
-      b.innerHTML = `
-        <span class="program-tile-duration">${p.duration} мин</span>
-        <span class="program-tile-blocks">${p.blocks.length} блоков</span>
-      `;
-      b.addEventListener('click', () => openProgramPreview(p.id));
-      tiles.appendChild(b);
-    });
-    group.appendChild(tiles);
-    root.appendChild(group);
+// User picks difficulty + duration in two sheets, then taps "Далее" to
+// open the preview for the matching program. Both selections persist
+// only as picker state — they're not saved between sessions.
+const programPicker = {
+  difficulty: null,  // 'beginner' | 'intermediate' | 'advanced'
+  duration: null,    // 15 | 30 | 60
+};
+
+function syncProgramPickerUI() {
+  const dEl = $('program-difficulty-text');
+  const tEl = $('program-duration-text');
+  const next = $('program-next');
+  if (!dEl || !tEl || !next) return;
+  if (programPicker.difficulty) {
+    dEl.textContent = DIFFICULTY_LABELS[programPicker.difficulty];
+    dEl.classList.add('is-filled');
+  } else {
+    dEl.textContent = 'Сложность';
+    dEl.classList.remove('is-filled');
   }
+  if (programPicker.duration) {
+    tEl.textContent = `${programPicker.duration} мин`;
+    tEl.classList.add('is-filled');
+  } else {
+    tEl.textContent = 'Длительность';
+    tEl.classList.remove('is-filled');
+  }
+  // Visually disabled but always clickable, so a tap can show the
+  // "выберите ..." toast instead of being silently ignored.
+  next.classList.toggle('is-disabled', !(programPicker.difficulty && programPicker.duration));
+}
+
+function openProgramDifficultySheet() {
+  const root = document.querySelector('#program-difficulty-modal .program-picker-options');
+  if (root) {
+    root.querySelectorAll('.program-picker-option').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.difficulty === programPicker.difficulty);
+    });
+  }
+  openModal('program-difficulty-modal');
+}
+
+function openProgramDurationSheet() {
+  const root = document.querySelector('#program-duration-modal .program-picker-options');
+  if (root) {
+    root.querySelectorAll('.program-picker-option').forEach(b => {
+      b.classList.toggle('is-active', Number(b.dataset.duration) === programPicker.duration);
+    });
+  }
+  openModal('program-duration-modal');
 }
 
 function openProgramPreview(id) {
@@ -2415,7 +2498,6 @@ function attemptCloseRunner() {
 // {id, name, bpm, pattern: {voice: [0|1 × 16]}}.
 
 const RHYTHMS_KEY = 'metronome.rhythms';
-const RHYTHM_CELLS = 16;
 // Row order in the editor grid (top to bottom) — standard drum-tab
 // vertical ordering: cymbals up top, kick at the bottom, snare and
 // toms interleaved by pitch.
@@ -2429,15 +2511,50 @@ const RHYTHM_VOICES = [
   { key: 'kick',  label: 'бочка' },
 ];
 
+// Time signatures the user can pick. `beats` = top number (drives cell
+// count), `unit` = bottom number (display only). `8`-bottom signatures
+// are felt as eighth-note pulses.
+const TIME_SIGNATURES = [
+  { beats: 2,  unit: 4 },
+  { beats: 3,  unit: 4 },
+  { beats: 4,  unit: 4 },
+  { beats: 5,  unit: 4 },
+  { beats: 6,  unit: 8 },
+  { beats: 7,  unit: 8 },
+  { beats: 12, unit: 8 },
+];
+
+// Subdivisions = cells per beat. Triplets share a beat with 3 cells,
+// sixteenths with 4, etc. The picker labels these with a note glyph.
+const DIVISIONS = [
+  { value: 1, glyph: '♩',  label: 'четверти' },
+  { value: 2, glyph: '♪',  label: 'восьмые' },
+  { value: 3, glyph: '3',  label: 'триоли' },
+  { value: 4, glyph: '♬',  label: 'шестнадцатые' },
+];
+
+// 12/8 with sixteenths or triplets balloons to 36-48 cells — too thin to
+// tap on a phone. Cap at eighths for that signature only.
+function allowedDivisionsFor(beats) {
+  return beats === 12 ? [1, 2] : [1, 2, 3, 4];
+}
+
 let rhythms = [];
 
 const editorState = {
   current: null,            // id of the rhythm being edited, or null = new
-  pattern: null,            // { voiceKey: number[16] (0|1) }
+  pattern: null,            // { voiceKey: number[beats * division] (0|1) }
   bpm: 100,
+  beats: 4,
+  beatUnit: 4,
+  division: 4,
   name: '',
   mode: 'with-drums',
 };
+
+// Pending size/division change waiting on the confirm sheet; null when
+// no confirmation is in-flight.
+let pendingMeterChange = null;
 
 const rhythmPlayer = {
   active: false,
@@ -2449,9 +2566,14 @@ const rhythmPlayer = {
   highlightedCell: -1,
 };
 
-function emptyPattern() {
+function rhythmCellCount(beats = editorState.beats, division = editorState.division) {
+  return beats * division;
+}
+
+function emptyPattern(beats = 4, division = 4) {
+  const total = beats * division;
   const p = {};
-  for (const v of RHYTHM_VOICES) p[v.key] = new Array(RHYTHM_CELLS).fill(0);
+  for (const v of RHYTHM_VOICES) p[v.key] = new Array(total).fill(0);
   return p;
 }
 
@@ -2461,19 +2583,30 @@ function loadRhythms() {
     if (!raw) return;
     const arr = JSON.parse(raw);
     if (Array.isArray(arr)) {
-      // Defensive: ensure each entry has all expected voices and 16 cells
-      rhythms = arr.map(r => ({
-        id: String(r.id || 'r-' + Date.now()),
-        name: String(r.name || 'Без названия'),
-        bpm: Number.isFinite(r.bpm) ? r.bpm : 100,
-        pattern: normalizePattern(r.pattern),
-      }));
+      // Defensive: legacy entries had no beats/division and assumed 4/4
+      // sixteenths. New entries persist all three so reload restores the
+      // exact grid the user saved.
+      rhythms = arr.map(r => {
+        const beats = Number.isFinite(r.beats) ? r.beats : 4;
+        const beatUnit = Number.isFinite(r.beatUnit) ? r.beatUnit : 4;
+        const division = Number.isFinite(r.division) ? r.division : 4;
+        return {
+          id: String(r.id || 'r-' + Date.now()),
+          name: String(r.name || 'Без названия'),
+          bpm: Number.isFinite(r.bpm) ? r.bpm : 100,
+          beats,
+          beatUnit,
+          division,
+          pattern: normalizePattern(r.pattern, beats, division),
+        };
+      });
     }
   } catch {}
 }
 
-function normalizePattern(raw) {
-  const p = emptyPattern();
+function normalizePattern(raw, beats = 4, division = 4) {
+  const total = beats * division;
+  const p = emptyPattern(beats, division);
   if (!raw || typeof raw !== 'object') return p;
   // Legacy migration: earlier versions used 'crash' instead of 'ride'.
   // Treat the old key as if it were the new one.
@@ -2481,10 +2614,35 @@ function normalizePattern(raw) {
   for (const v of RHYTHM_VOICES) {
     const arr = raw[v.key];
     if (Array.isArray(arr)) {
-      for (let i = 0; i < RHYTHM_CELLS; i++) p[v.key][i] = arr[i] ? 1 : 0;
+      for (let i = 0; i < Math.min(total, arr.length); i++) p[v.key][i] = arr[i] ? 1 : 0;
     }
   }
   return p;
+}
+
+// Map an existing pattern to a new beats/division grid. Hits at positions
+// that align with the new division survive; off-grid hits and hits in
+// dropped beats are counted in `lostHits` so the caller can ask for
+// confirmation before applying.
+function resamplePattern(oldPattern, oldBeats, oldDiv, newBeats, newDiv) {
+  const newPattern = emptyPattern(newBeats, newDiv);
+  let lostHits = 0;
+  for (const v of RHYTHM_VOICES) {
+    const oldArr = oldPattern[v.key] || [];
+    for (let i = 0; i < oldArr.length; i++) {
+      if (!oldArr[i]) continue;
+      const beat = Math.floor(i / oldDiv);
+      if (beat >= newBeats) { lostHits++; continue; }
+      const posInBeat = i % oldDiv;
+      // Position within beat as fraction = posInBeat / oldDiv.
+      // To survive, this fraction must be expressible as k / newDiv.
+      const num = posInBeat * newDiv;
+      if (num % oldDiv !== 0) { lostHits++; continue; }
+      const newPos = num / oldDiv;
+      newPattern[v.key][beat * newDiv + newPos] = 1;
+    }
+  }
+  return { pattern: newPattern, lostHits };
 }
 
 function persistRhythms() {
@@ -2539,10 +2697,14 @@ function loadRhythmIntoEditor(id) {
   if (!r) return;
   if (rhythmPlayer.active) stopRhythmPlayback();
   editorState.current = r.id;
-  editorState.pattern = normalizePattern(r.pattern);
+  editorState.beats = r.beats || 4;
+  editorState.beatUnit = r.beatUnit || 4;
+  editorState.division = r.division || 4;
+  editorState.pattern = normalizePattern(r.pattern, editorState.beats, editorState.division);
   editorState.bpm = r.bpm;
   editorState.name = r.name;
-  $('rhythm-bpm').value = r.bpm;
+  $('rhythm-bpm').textContent = r.bpm;
+  syncRhythmMetaUI();
   buildRhythmGrid();
 }
 
@@ -2551,18 +2713,25 @@ function openRhythmEditor() {
   // To open a saved rhythm, use the bookmark icon → tap a saved row.
   if (rhythmPlayer.active) stopRhythmPlayback();
   editorState.current = null;
-  editorState.pattern = emptyPattern();
+  editorState.beats = 4;
+  editorState.beatUnit = 4;
+  editorState.division = 4;
+  editorState.pattern = emptyPattern(editorState.beats, editorState.division);
   editorState.bpm = 100;
   editorState.name = '';
   editorState.mode = 'with-drums';
 
-  $('rhythm-bpm').value = editorState.bpm;
+  $('rhythm-bpm').textContent = editorState.bpm;
   syncRhythmModeUI();
+  syncRhythmMetaUI();
   buildRhythmGrid();
 
   const el = $('rhythm-editor');
   el.classList.add('open');
   el.setAttribute('aria-hidden', 'false');
+  // Toggle a body-level flag so any modals opened on top of the rotated
+  // editor can match the same rotation transform via CSS.
+  document.body.classList.add('rhythm-editor-open');
 }
 
 function closeRhythmEditor() {
@@ -2570,30 +2739,44 @@ function closeRhythmEditor() {
   const el = $('rhythm-editor');
   el.classList.remove('open');
   el.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('rhythm-editor-open');
 }
 
 function buildRhythmGrid() {
-  // Grid layout: 17 columns × 7 rows (1 label + 16 cells per voice row).
-  // Time runs LEFT-TO-RIGHT in the landscape view; voice labels in the
-  // auto column on the left. Children are emitted row-by-row so they
-  // flow naturally into the 17-col grid.
+  // Grid layout: (1 label + N cells) × 7 rows. Time runs LEFT-TO-RIGHT
+  // in the landscape view; voice labels in the auto column on the left.
+  // Cell count is dynamic = beats × division, set on the inline style so
+  // CSS doesn't need to know the value.
   const grid = $('rhythm-grid');
   grid.innerHTML = '';
+  const cells = rhythmCellCount();
+  const div = editorState.division;
+  grid.style.gridTemplateColumns = `auto repeat(${cells}, 1fr)`;
   for (const v of RHYTHM_VOICES) {
     const label = document.createElement('div');
     label.className = 'rhythm-voice-label';
     label.textContent = v.label;
     grid.appendChild(label);
-    for (let i = 0; i < RHYTHM_CELLS; i++) {
+    for (let i = 0; i < cells; i++) {
       const cell = document.createElement('button');
       cell.className = 'rhythm-cell';
       cell.dataset.voice = v.key;
       cell.dataset.cell = String(i);
-      if (i % 4 === 0) cell.dataset.beat = 'true';
+      if (i % div === 0) cell.dataset.beat = 'true';
       if (editorState.pattern[v.key][i]) cell.classList.add('hit');
       cell.addEventListener('click', () => toggleRhythmCell(v.key, i, cell));
       grid.appendChild(cell);
     }
+  }
+}
+
+function syncRhythmMetaUI() {
+  const sigEl = $('rhythm-size-value');
+  if (sigEl) sigEl.textContent = `${editorState.beats}/${editorState.beatUnit}`;
+  const divEl = $('rhythm-division-value');
+  if (divEl) {
+    const def = DIVISIONS.find(d => d.value === editorState.division) || DIVISIONS[3];
+    divEl.textContent = def.glyph;
   }
 }
 
@@ -2612,6 +2795,107 @@ function clearRhythmGrid() {
   document.querySelectorAll('.rhythm-cell.hit').forEach(c => c.classList.remove('hit'));
 }
 
+// --- Meter / division pickers ---
+
+function openRhythmSizeSheet() {
+  const root = $('rhythm-size-options');
+  if (!root) return;
+  root.innerHTML = '';
+  for (const sig of TIME_SIGNATURES) {
+    const btn = document.createElement('button');
+    btn.className = 'rhythm-meter-option';
+    if (sig.beats === editorState.beats && sig.unit === editorState.beatUnit) {
+      btn.classList.add('is-active');
+    }
+    btn.textContent = `${sig.beats}/${sig.unit}`;
+    btn.addEventListener('click', () => {
+      closeModal('rhythm-size-modal');
+      requestMeterChange(sig.beats, sig.unit);
+    });
+    root.appendChild(btn);
+  }
+  openModal('rhythm-size-modal');
+}
+
+function openRhythmDivisionSheet() {
+  const root = $('rhythm-division-options');
+  if (!root) return;
+  root.innerHTML = '';
+  const allowed = allowedDivisionsFor(editorState.beats);
+  for (const def of DIVISIONS) {
+    if (!allowed.includes(def.value)) continue;
+    const btn = document.createElement('button');
+    btn.className = 'rhythm-division-option';
+    if (def.value === editorState.division) btn.classList.add('is-active');
+    btn.innerHTML = `<span class="rhythm-division-glyph">${def.glyph}</span><span class="rhythm-division-name">${def.label}</span>`;
+    btn.addEventListener('click', () => {
+      closeModal('rhythm-division-modal');
+      requestDivisionChange(def.value);
+    });
+    root.appendChild(btn);
+  }
+  openModal('rhythm-division-modal');
+}
+
+// Apply a meter (beats/unit) change. If switching to 12/8 with the
+// current division forbidden there, downgrade division to the largest
+// allowed value at the same time. Confirms with the user if the change
+// would drop existing hits.
+function requestMeterChange(newBeats, newUnit) {
+  if (rhythmPlayer.active) stopRhythmPlayback();
+  let targetDiv = editorState.division;
+  const allowed = allowedDivisionsFor(newBeats);
+  if (!allowed.includes(targetDiv)) targetDiv = Math.max(...allowed);
+  if (newBeats === editorState.beats && newUnit === editorState.beatUnit && targetDiv === editorState.division) return;
+  const { pattern, lostHits } = resamplePattern(
+    editorState.pattern,
+    editorState.beats, editorState.division,
+    newBeats, targetDiv,
+  );
+  const apply = () => {
+    editorState.beats = newBeats;
+    editorState.beatUnit = newUnit;
+    editorState.division = targetDiv;
+    editorState.pattern = pattern;
+    syncRhythmMetaUI();
+    buildRhythmGrid();
+  };
+  if (lostHits > 0) {
+    askMeterConfirm(`Действительно ли вы хотите изменить размер на ${newBeats}/${newUnit}? Часть выставленных ударов будет удалена.`, apply);
+  } else {
+    apply();
+  }
+}
+
+function requestDivisionChange(newDiv) {
+  if (rhythmPlayer.active) stopRhythmPlayback();
+  if (newDiv === editorState.division) return;
+  const { pattern, lostHits } = resamplePattern(
+    editorState.pattern,
+    editorState.beats, editorState.division,
+    editorState.beats, newDiv,
+  );
+  const def = DIVISIONS.find(d => d.value === newDiv);
+  const label = def ? def.label : '';
+  const apply = () => {
+    editorState.division = newDiv;
+    editorState.pattern = pattern;
+    syncRhythmMetaUI();
+    buildRhythmGrid();
+  };
+  if (lostHits > 0) {
+    askMeterConfirm(`Действительно ли вы хотите изменить деления на «${label}»? Часть выставленных ударов будет удалена.`, apply);
+  } else {
+    apply();
+  }
+}
+
+function askMeterConfirm(text, onConfirm) {
+  pendingMeterChange = onConfirm;
+  $('rhythm-confirm-text').textContent = text;
+  openModal('rhythm-confirm-modal');
+}
+
 function syncRhythmModeUI() {
   const btn = $('rhythm-mode');
   // aria-pressed="true" = drums on (lime), "false" = click-only (default).
@@ -2625,7 +2909,7 @@ function toggleRhythmMode() {
 
 function saveRhythm() {
   const name = ($('rhythm-save-name').value || '').trim() || 'Без названия';
-  const bpm = Math.max(30, Math.min(320, Number($('rhythm-bpm').value) || 100));
+  const bpm = Math.max(30, Math.min(320, Number($('rhythm-bpm').textContent) || 100));
   editorState.bpm = bpm;
   editorState.name = name;
   if (editorState.current) {
@@ -2633,11 +2917,20 @@ function saveRhythm() {
     if (r) {
       r.name = name;
       r.bpm = bpm;
-      r.pattern = normalizePattern(editorState.pattern);
+      r.beats = editorState.beats;
+      r.beatUnit = editorState.beatUnit;
+      r.division = editorState.division;
+      r.pattern = normalizePattern(editorState.pattern, editorState.beats, editorState.division);
     }
   } else {
     const id = 'r-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-    rhythms.push({ id, name, bpm, pattern: normalizePattern(editorState.pattern) });
+    rhythms.push({
+      id, name, bpm,
+      beats: editorState.beats,
+      beatUnit: editorState.beatUnit,
+      division: editorState.division,
+      pattern: normalizePattern(editorState.pattern, editorState.beats, editorState.division),
+    });
     editorState.current = id;
   }
   persistRhythms();
@@ -2770,8 +3063,10 @@ function stopRhythmPlayback() {
 function rhythmTickScheduler() {
   if (!rhythmPlayer.active) return;
   const SCHED_AHEAD = 0.1;
+  const cells = rhythmCellCount();
+  const div = editorState.division;
   while (rhythmPlayer.nextTime < audioCtx.currentTime + SCHED_AHEAD) {
-    const idx = rhythmPlayer.cellIdx % RHYTHM_CELLS;
+    const idx = rhythmPlayer.cellIdx % cells;
     const t = rhythmPlayer.nextTime;
     if (editorState.mode === 'with-drums') {
       // Listening to the pattern — drum voices only, no metronome click
@@ -2780,15 +3075,15 @@ function rhythmTickScheduler() {
         if (editorState.pattern[v.key][idx]) playDrumVoice(v.key, t);
       }
     } else {
-      // Practicing — only the metronome click on every 4th cell, drums
-      // are silent so the user plays them.
-      if (idx % 4 === 0) {
+      // Practicing — only the metronome click on each beat (every
+      // `division` cells), drums are silent so the user plays them.
+      if (idx % div === 0) {
         const beatType = idx === 0 ? 'accent' : 'beat';
         playClick(beatType, t);
       }
     }
     rhythmPlayer.cues.push({ cellIdx: idx, time: t });
-    const secPerCell = (60.0 / editorState.bpm) / 4;
+    const secPerCell = (60.0 / editorState.bpm) / div;
     rhythmPlayer.nextTime += secPerCell;
     rhythmPlayer.cellIdx++;
   }
@@ -2853,7 +3148,7 @@ function init() {
   rebuildBeatIndicator();
   renderBuiltinPresets();
   renderUserPresets();
-  renderProgramTiles();
+  syncProgramPickerUI();
   loadRhythms();
   updateSubDisplay();
   updateTimeDisplay();
