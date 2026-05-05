@@ -4,16 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 
-  <!-- Yandex.Metrika counter -->
+  <!-- Yandex.Metrika counter (skipped if user opted out in Settings) -->
   <script type="text/javascript">
-    (function(m,e,t,r,i,k,a){
-        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-        m[i].l=1*new Date();
-        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
-    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=109016048', 'ym');
+    (function(){
+      try {
+        if (localStorage.getItem('metronome.analytics-disabled') === '1') return;
+      } catch {}
+      (function(m,e,t,r,i,k,a){
+          m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+          m[i].l=1*new Date();
+          for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+          k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+      })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=109016048', 'ym');
 
-    ym(109016048, 'init', {ssr:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+      ym(109016048, 'init', {ssr:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+    })();
   </script>
   <!-- /Yandex.Metrika counter -->
 
@@ -239,8 +244,8 @@
         <details>
           <summary>Громкость</summary>
           <div class="vol">
-            <label>Общая <output id="vol-master-out">70</output>%</label>
-            <input id="vol-master" type="range" min="0" max="100" value="70">
+            <label>Общая <output id="vol-master-out">100</output>%</label>
+            <input id="vol-master" type="range" min="0" max="100" value="100">
           </div>
           <div class="vol">
             <label>Акцент (1-я доля) <output id="vol-accent-out">100</output>%</label>
@@ -295,6 +300,27 @@
             <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
             <button class="preset" data-bt-preset="200">AirPods</button>
           </div>
+        </details>
+
+        <details>
+          <summary>Аналитика</summary>
+          <p class="muted small">Мы используем Яндекс.Метрику, чтобы видеть, какие функции работают, а какие нет. Никаких личных данных не собираем.</p>
+          <label class="toggle">
+            <input id="analytics-on" type="checkbox" checked>
+            <span>Разрешить аналитику</span>
+          </label>
+        </details>
+
+        <details>
+          <summary>Поддержка</summary>
+          <p class="muted small">Нашёл баг, есть вопрос или идея? Напиши в Телеграм:</p>
+          <p><a href="https://t.me/MaxKachkovenko" target="_blank" rel="noopener">@MaxKachkovenko</a></p>
+        </details>
+
+        <details>
+          <summary>Сброс настроек</summary>
+          <p class="muted small">Вернёт тему, громкость, звуки и задержку наушников к значениям по умолчанию. Сохранённые ритмы и BPM-пресеты останутся.</p>
+          <button class="settings-reset-btn" id="settings-reset">Сбросить настройки</button>
         </details>
 
         <p class="muted small">Установить как приложение: меню браузера → «Установить» / «На экран Домой»</p>

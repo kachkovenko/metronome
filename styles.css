@@ -1998,7 +1998,9 @@ details > *:last-child { padding-bottom: 16px; }
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--card-2);
 }
 
 .rhythm-save-form input {
@@ -2505,6 +2507,21 @@ details > *:last-child { padding-bottom: 16px; }
 
 .rhythm-confirm-cancel:active,
 .rhythm-confirm-ok:active { transform: scale(0.97); }
+
+/* Settings reset — destructive action, paint it red. */
+.settings-reset-btn {
+  background: #e64a4a;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.06s ease;
+}
+.settings-reset-btn:active { transform: scale(0.97); }
 
 /* === Count-in countdown overlay === */
 .countin-overlay {

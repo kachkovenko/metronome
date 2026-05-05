@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.20.0';
 
 const state = {
   bpm: 100,
@@ -14,7 +14,7 @@ const state = {
   currentBeat: 0,
   currentSub: 0,
 
-  volMaster: 0.7,
+  volMaster: 1.0,
   volAccent: 1.0,
   volBeat: 0.7,
   volSub: 0.4,
@@ -67,6 +67,15 @@ const INPUT_LATENCY_KEY = 'metronome.input-latency-ms';
 const THEME_KEY = 'metronome.theme';
 const SOUND_ACCENT_KEY = 'metronome.sound-accent';
 const SOUND_BEAT_KEY = 'metronome.sound-beat';
+const ANALYTICS_DISABLED_KEY = 'metronome.analytics-disabled';
+
+// Settings keys cleared by "Сброс настроек". User content (saved
+// rhythms, BPM presets) is intentionally NOT in this list.
+const RESETTABLE_KEYS = [
+  BT_LATENCY_KEY, BT_AUTO_KEY, INPUT_LATENCY_KEY,
+  THEME_KEY, SOUND_ACCENT_KEY, SOUND_BEAT_KEY,
+  ANALYTICS_DISABLED_KEY,
+];
 
 const THEME_COLORS = { dark: '#000000', light: '#f5f5f7' };
 
@@ -1521,6 +1530,36 @@ function bind() {
 
   // Presets
   $('preset-save').addEventListener('click', saveCurrentAsPreset);
+
+  // Analytics opt-out — gating happens in the inline <head> script (it
+  // skips loading the Yandex Metrika tag if the key is set). Mid-session
+  // toggling pauses/resumes via ym() so the change applies immediately.
+  const analyticsOn = $('analytics-on');
+  if (analyticsOn) {
+    analyticsOn.checked = localStorage.getItem(ANALYTICS_DISABLED_KEY) !== '1';
+    analyticsOn.addEventListener('change', () => {
+      const enabled = analyticsOn.checked;
+      try {
+        if (enabled) localStorage.removeItem(ANALYTICS_DISABLED_KEY);
+        else localStorage.setItem(ANALYTICS_DISABLED_KEY, '1');
+      } catch {}
+      try {
+        if (typeof window.ym === 'function') {
+          window.ym(109016048, enabled ? 'resumeTracking' : 'pauseTracking');
+        }
+      } catch {}
+    });
+  }
+
+  // Reset settings — clears the settings keys and reloads. User content
+  // (rhythms, BPM presets) is preserved.
+  $('settings-reset').addEventListener('click', () => {
+    if (!confirm('Сбросить все настройки до значений по умолчанию?')) return;
+    for (const key of RESETTABLE_KEYS) {
+      try { localStorage.removeItem(key); } catch {}
+    }
+    location.reload();
+  });
 
   // Keyboard
   document.addEventListener('keydown', e => {
