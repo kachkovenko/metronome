@@ -233,97 +233,147 @@
 
       <!-- Tab: Настройки -->
       <section class="tab-view" id="tab-settings" data-tab="settings">
-        <details>
-          <summary>Тема</summary>
-          <div class="presets" id="theme-picker">
-            <button class="preset" data-theme="dark">Тёмная</button>
-            <button class="preset" data-theme="light">Светлая</button>
-          </div>
-        </details>
-
-        <details>
-          <summary>Громкость</summary>
-          <div class="vol">
-            <label>Общая <output id="vol-master-out">100</output>%</label>
-            <input id="vol-master" type="range" min="0" max="100" value="100">
-          </div>
-          <div class="vol">
-            <label>Акцент (1-я доля) <output id="vol-accent-out">100</output>%</label>
-            <input id="vol-accent" type="range" min="0" max="100" value="100">
-          </div>
-          <div class="vol">
-            <label>Доля <output id="vol-beat-out">70</output>%</label>
-            <input id="vol-beat" type="range" min="0" max="100" value="70">
-          </div>
-          <div class="vol">
-            <label>Деление <output id="vol-sub-out">40</output>%</label>
-            <input id="vol-sub" type="range" min="0" max="100" value="40">
-          </div>
-        </details>
-
-        <details>
-          <summary>Звуки метронома</summary>
-          <div class="vol">
-            <label>Акцент</label>
-            <div class="presets" id="sound-accent-picker">
-              <button class="preset" data-sound="click">Клик</button>
-              <button class="preset" data-sound="wood">Дерево</button>
-              <button class="preset" data-sound="beep">Бип</button>
+        <!-- Group 1: appearance, sound, latency -->
+        <div class="settings-group">
+          <details>
+            <summary>
+              <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+              <span>Тема</span>
+            </summary>
+            <div class="presets" id="theme-picker">
+              <button class="preset" data-theme="dark">Тёмная</button>
+              <button class="preset" data-theme="light">Светлая</button>
             </div>
-          </div>
-          <div class="vol">
-            <label>Доля</label>
-            <div class="presets" id="sound-beat-picker">
-              <button class="preset" data-sound="click">Клик</button>
-              <button class="preset" data-sound="wood">Дерево</button>
-              <button class="preset" data-sound="beep">Бип</button>
+          </details>
+
+          <details>
+            <summary>
+              <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+              <span>Громкость</span>
+            </summary>
+            <div class="vol">
+              <label>Общая <output id="vol-master-out">100</output>%</label>
+              <input id="vol-master" type="range" min="0" max="100" value="100">
             </div>
-          </div>
-        </details>
+            <div class="vol">
+              <label>Акцент (1-я доля) <output id="vol-accent-out">100</output>%</label>
+              <input id="vol-accent" type="range" min="0" max="100" value="100">
+            </div>
+            <div class="vol">
+              <label>Доля <output id="vol-beat-out">70</output>%</label>
+              <input id="vol-beat" type="range" min="0" max="100" value="70">
+            </div>
+            <div class="vol">
+              <label>Деление <output id="vol-sub-out">40</output>%</label>
+              <input id="vol-sub" type="range" min="0" max="100" value="40">
+            </div>
+          </details>
 
-        <details>
-          <summary>Задержка наушников</summary>
-          <p class="muted small">Если играешь в Bluetooth-наушниках, звук приходит с задержкой. Визуальный индикатор сдвигается позже, чтобы вспышка совпала с кликом в наушниках.</p>
+          <details>
+            <summary>
+              <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"/>
+                <circle cx="6" cy="18" r="3"/>
+                <circle cx="18" cy="16" r="3"/>
+              </svg>
+              <span>Звуки метронома</span>
+            </summary>
+            <div class="vol">
+              <label>Акцент</label>
+              <div class="presets" id="sound-accent-picker">
+                <button class="preset" data-sound="click">Клик</button>
+                <button class="preset" data-sound="wood">Дерево</button>
+                <button class="preset" data-sound="beep">Бип</button>
+              </div>
+            </div>
+            <div class="vol">
+              <label>Доля</label>
+              <div class="presets" id="sound-beat-picker">
+                <button class="preset" data-sound="click">Клик</button>
+                <button class="preset" data-sound="wood">Дерево</button>
+                <button class="preset" data-sound="beep">Бип</button>
+              </div>
+            </div>
+          </details>
 
-          <label class="toggle">
-            <input id="bt-auto" type="checkbox" checked>
-            <span>Автоопределение</span>
-          </label>
-          <p class="muted small bt-detected-line">При старте читаем <code>audioCtx.outputLatency</code>. Определено: <output id="bt-detected">—</output></p>
+          <details>
+            <summary>
+              <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+                <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+              </svg>
+              <span>Задержка наушников</span>
+            </summary>
+            <p class="muted small">Если играешь в Bluetooth-наушниках, звук приходит с задержкой. Визуальный индикатор сдвигается позже, чтобы вспышка совпала с кликом в наушниках.</p>
 
-          <div class="vol" id="bt-lag-row">
-            <label>Задержка <output id="bt-lag-out">0</output> мс</label>
-            <input id="bt-lag" type="range" min="0" max="400" step="5" value="0">
-          </div>
-          <div class="presets" id="bt-presets">
-            <button class="preset" data-bt-preset="0">Проводные</button>
-            <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
-            <button class="preset" data-bt-preset="200">AirPods</button>
-          </div>
-        </details>
+            <label class="toggle">
+              <input id="bt-auto" type="checkbox" checked>
+              <span>Автоопределение</span>
+            </label>
+            <p class="muted small bt-detected-line">При старте читаем <code>audioCtx.outputLatency</code>. Определено: <output id="bt-detected">—</output></p>
 
-        <details>
-          <summary>Аналитика</summary>
-          <p class="muted small">Мы используем Яндекс.Метрику, чтобы видеть, какие функции работают, а какие нет. Никаких личных данных не собираем.</p>
-          <label class="toggle">
-            <input id="analytics-on" type="checkbox" checked>
-            <span>Разрешить аналитику</span>
-          </label>
-        </details>
+            <div class="vol" id="bt-lag-row">
+              <label>Задержка <output id="bt-lag-out">0</output> мс</label>
+              <input id="bt-lag" type="range" min="0" max="400" step="5" value="0">
+            </div>
+            <div class="presets" id="bt-presets">
+              <button class="preset" data-bt-preset="0">Проводные</button>
+              <button class="preset" data-bt-preset="150">Bluetooth обычные</button>
+              <button class="preset" data-bt-preset="200">AirPods</button>
+            </div>
+          </details>
+        </div>
 
-        <details>
-          <summary>Поддержка</summary>
-          <p class="muted small">Нашёл баг, есть вопрос или идея? Напиши в Телеграм:</p>
-          <p><a href="https://t.me/MaxKachkovenko" target="_blank" rel="noopener">@MaxKachkovenko</a></p>
-        </details>
+        <!-- Group 2: privacy, support, reset -->
+        <div class="settings-group">
+          <details>
+            <summary>
+              <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              <span>Аналитика</span>
+            </summary>
+            <p class="muted small">Мы используем Яндекс.Метрику, чтобы видеть, какие функции работают, а какие нет. Никаких личных данных не собираем.</p>
+            <label class="toggle">
+              <input id="analytics-on" type="checkbox" checked>
+              <span>Разрешить аналитику</span>
+            </label>
+          </details>
 
-        <details>
-          <summary>Сброс настроек</summary>
-          <p class="muted small">Вернёт тему, громкость, звуки и задержку наушников к значениям по умолчанию. Сохранённые ритмы и BPM-пресеты останутся.</p>
-          <div>
-            <button class="settings-reset-btn" id="settings-reset">Сбросить настройки</button>
-          </div>
-        </details>
+          <details>
+            <summary>
+              <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              <span>Поддержка</span>
+            </summary>
+            <p class="muted small">Нашёл баг, есть вопрос или идея? Напиши в Телеграм:</p>
+            <p><a href="https://t.me/MaxKachkovenko" target="_blank" rel="noopener">@MaxKachkovenko</a></p>
+          </details>
+
+          <details>
+            <summary>
+              <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"/>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+              </svg>
+              <span>Сброс настроек</span>
+            </summary>
+            <p class="muted small">Вернёт тему, громкость, звуки и задержку наушников к значениям по умолчанию. Сохранённые ритмы и BPM-пресеты останутся.</p>
+            <div>
+              <button class="settings-reset-btn" id="settings-reset">Сбросить настройки</button>
+            </div>
+          </details>
+        </div>
 
         <p class="muted small">Установить как приложение: меню браузера → «Установить» / «На экран Домой»</p>
 

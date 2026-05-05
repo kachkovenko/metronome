@@ -710,12 +710,46 @@ details {
 
 details > summary {
   cursor: pointer;
-  padding: 16px 18px;
+  padding: 16px 44px 16px 18px;
   font-weight: 500;
   font-size: 15px;
   list-style: none;
   position: relative;
   user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* iOS-style grouped settings: multiple <details> share one rounded card,
+   with a thin separator between rows (drawn from after the icon column
+   so it doesn't slice through the icons). */
+.settings-group {
+  background: var(--card-2);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.settings-group > details {
+  background: transparent;
+  border-radius: 0;
+}
+
+.settings-group > details + details > summary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50px;
+  right: 18px;
+  height: 1px;
+  background: var(--card-3);
+}
+
+.settings-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--fg);
 }
 
 details > summary::-webkit-details-marker { display: none; }
