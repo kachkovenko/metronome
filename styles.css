@@ -2508,6 +2508,15 @@ details > *:last-child { padding-bottom: 16px; }
 .rhythm-confirm-cancel:active,
 .rhythm-confirm-ok:active { transform: scale(0.97); }
 
+/* Override the default blue link color inside collapsible settings
+   sections (e.g. the Telegram link in Поддержка) — it doesn't fit the
+   muted dark UI. */
+details a {
+  color: var(--fg);
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+}
+
 /* Settings reset — destructive action, paint it red. */
 .settings-reset-btn {
   background: #e64a4a;
