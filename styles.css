@@ -1650,6 +1650,372 @@ details > *:last-child { padding-bottom: 16px; }
   transform: translateX(-50%) translateY(0);
 }
 
+/* ==================================================
+   Rhythm builder ("Конструктор ритма")
+   ================================================== */
+
+/* Trainer-list entry — same visual weight as <summary> but tap-to-open
+   instead of toggle. Sits inside the "Тренажёры" section alongside the
+   regular details/summary trainers. */
+.trainer-row {
+  background: var(--card-2);
+  border-radius: var(--radius-md);
+  border: none;
+  padding: 16px 18px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.trainer-row:active { transform: scale(0.99); background: var(--card-3); }
+
+.trainer-row::after {
+  content: '';
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-top: 2px solid var(--muted);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* Editor — fullscreen overlay laid out as LANDSCAPE (meta | grid |
+   actions). Mirrors the structural pattern of #flash-screen exactly:
+   3-column grid container, rotates 90° clockwise on portrait phones
+   so the user turns the phone 90° left to view horizontally. */
+.rhythm-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: none;
+  background: var(--bg);
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.rhythm-editor.open {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 20px;
+  align-items: stretch;
+  animation: fadeIn 0.18s ease;
+}
+
+/* Shared icon-button — same visual contract as .bpm-icon-btn on the
+   main screen (36px circle on card-2). */
+.rhythm-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.06s ease;
+}
+
+.rhythm-icon-btn svg { width: 18px; height: 18px; }
+.rhythm-icon-btn:hover { color: var(--fg); }
+.rhythm-icon-btn:active { transform: scale(0.94); background: var(--card-3); }
+.rhythm-icon-btn[aria-pressed="true"] { background: var(--accent); color: #000; }
+
+/* === Left column: meta strip === */
+.rhythm-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  z-index: 2;
+}
+
+.rhythm-meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+}
+
+.rhythm-meta-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.rhythm-meta-value-symbol { font-size: 26px; }
+
+.rhythm-meta-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* BPM stepper — chevrons above + below the number; small "BPM" label
+   below to match the other meta items. */
+.rhythm-bpm-stepper { gap: 0; }
+
+.rhythm-bpm-arrow {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 1px 6px;
+  display: grid;
+  place-items: center;
+  transition: color 0.15s ease, transform 0.06s ease;
+}
+
+.rhythm-bpm-arrow svg { width: 14px; height: 14px; }
+.rhythm-bpm-arrow:hover { color: var(--fg); }
+.rhythm-bpm-arrow:active { transform: scale(0.9); }
+
+#rhythm-bpm {
+  width: 64px;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  text-align: center;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  -moz-appearance: textfield;
+}
+
+#rhythm-bpm::-webkit-outer-spin-button,
+#rhythm-bpm::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* === Middle column: grid === */
+.rhythm-editor-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  z-index: 2;
+}
+
+/* 7 voice rows × 16 time cells, with the voice label in the auto column
+   on the left. Both cell columns and voice rows use 1fr so cells stretch
+   to fill the available landscape width and height (no overflow, no
+   scroll). */
+.rhythm-grid {
+  display: grid;
+  grid-template-columns: auto repeat(16, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+}
+
+.rhythm-voice-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.rhythm-cell {
+  background: var(--card);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.06s ease, transform 0.06s ease;
+}
+
+/* Every 4th column (downbeat) is a touch lighter so beats are readable. */
+.rhythm-cell[data-beat="true"] { background: var(--card-2); }
+.rhythm-cell.hit { background: var(--accent); }
+.rhythm-cell:active { transform: scale(0.9); }
+.rhythm-cell.playing { box-shadow: 0 0 0 2px var(--fg); }
+
+/* === Right column: action icons === */
+.rhythm-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  z-index: 2;
+}
+
+.rhythm-play-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(213, 255, 60, 0.25);
+  transition: transform 0.06s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.rhythm-play-btn:active { transform: scale(0.95); }
+.rhythm-play-btn.playing { background: var(--fg); }
+.rhythm-play-icon { line-height: 1; }
+
+/* Portrait phone — pre-rotate the editor 90° clockwise so the user
+   physically turns the phone 90° left to read it. Same pattern as
+   flash-screen. */
+@media (orientation: portrait) and (pointer: coarse), (orientation: portrait) and (max-width: 900px) {
+  .rhythm-editor.open {
+    width: 100dvh;
+    height: 100dvw;
+    transform: rotate(90deg);
+    transform-origin: 50dvmin 50dvmin;
+    padding:
+      max(16px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left))
+      max(16px, env(safe-area-inset-top));
+  }
+}
+
+
+/* Saved-rhythms sheet — slides up from bottom (uses existing .modal/.sheet
+   patterns from time-sig and presets modals). */
+.rhythm-save-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.rhythm-save-form input {
+  background: var(--card-2);
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.rhythm-save-form-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rhythm-save-form-btn:active { transform: scale(0.97); }
+
+.rhythm-saved-title { margin-top: 4px; }
+
+.rhythms-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rhythms-saved-list:empty::before {
+  content: 'Сохранённых ритмов пока нет';
+  display: block;
+  text-align: center;
+  color: var(--muted);
+  padding: 18px 0;
+  font-size: 13px;
+}
+
+.rhythm-saved-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.rhythm-saved-load {
+  background: var(--card-2);
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rhythm-saved-load:active { background: var(--card-3); }
+
+.rhythm-saved-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rhythm-saved-bpm { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+
+.rhythm-saved-active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.rhythm-saved-active .rhythm-saved-bpm { color: rgba(0,0,0,0.6); }
+
+.rhythm-saved-del {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--card-2);
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.rhythm-saved-del:hover { color: var(--fg); }
+.rhythm-saved-del svg { width: 16px; height: 16px; }
+
 @media (max-width: 380px) {
   #bpm-input { font-size: 64px; width: 150px; }
   .play-row { --play-h: 54px; }

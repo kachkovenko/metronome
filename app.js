@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.17.1';
+const APP_VERSION = '1.18.0';
 
 const state = {
   bpm: 100,
@@ -1310,6 +1310,39 @@ function bind() {
   $('runner-transition-go').addEventListener('click', hideTransition);
   $('runner-finish-close').addEventListener('click', exitProgram);
 
+  // Rhythm builder
+  $('open-rhythm-builder').addEventListener('click', openRhythmEditor);
+  $('rhythm-editor-close').addEventListener('click', closeRhythmEditor);
+  $('rhythm-presets-btn').addEventListener('click', openRhythmsSheet);
+  $('rhythm-clear').addEventListener('click', clearRhythmGrid);
+  $('rhythm-mode').addEventListener('click', () => {
+    if (rhythmPlayer.active) stopRhythmPlayback();
+    toggleRhythmMode();
+  });
+  $('rhythm-play').addEventListener('click', toggleRhythmPlay);
+  $('rhythm-save-btn').addEventListener('click', saveRhythm);
+  const adjustRhythmBpm = (delta) => {
+    const next = Math.max(30, Math.min(320, (editorState.bpm || 100) + delta));
+    editorState.bpm = next;
+    $('rhythm-bpm').value = next;
+  };
+  $('rhythm-bpm-up').addEventListener('click', () => adjustRhythmBpm(+1));
+  $('rhythm-bpm-down').addEventListener('click', () => adjustRhythmBpm(-1));
+  $('rhythm-bpm').addEventListener('change', e => {
+    editorState.bpm = Math.max(30, Math.min(320, Number(e.target.value) || 100));
+    e.target.value = editorState.bpm;
+  });
+  // Mouse wheel / touchpad scroll on the BPM number changes the value.
+  // Up scroll = +1, down scroll = -1. preventDefault so the page doesn't
+  // also scroll behind the editor.
+  $('rhythm-bpm').addEventListener('wheel', e => {
+    e.preventDefault();
+    adjustRhythmBpm(e.deltaY < 0 ? +1 : -1);
+  }, { passive: false });
+  $('rhythm-save-name').addEventListener('change', e => {
+    editorState.name = e.target.value.trim();
+  });
+
   // Count-in (delayed start) — picking arms; the countdown itself fires
   // from start() when the user presses the main Start button.
   $('countin-btn').addEventListener('click', () => {
@@ -2372,6 +2405,425 @@ function attemptCloseRunner() {
   if (confirm('Прервать программу?')) exitProgram();
 }
 
+// --- Rhythm builder ("Конструктор ритма") ---
+//
+// User-drawn drum patterns. 7 voices (crash/hat/snare/tom1/tom2/tom3/kick)
+// × 16 sixteenth-note cells in 4/4. Two playback modes:
+//   'with-drums' — synthesized drum voices + metronome click on the beat
+//   'click-only' — metronome click only (user practices the pattern)
+// Patterns are persisted in localStorage as an array of
+// {id, name, bpm, pattern: {voice: [0|1 × 16]}}.
+
+const RHYTHMS_KEY = 'metronome.rhythms';
+const RHYTHM_CELLS = 16;
+// Row order in the editor grid (top to bottom) — standard drum-tab
+// vertical ordering: cymbals up top, kick at the bottom, snare and
+// toms interleaved by pitch.
+const RHYTHM_VOICES = [
+  { key: 'ride',  label: 'райд' },
+  { key: 'hat',   label: 'хэт' },
+  { key: 'tom1',  label: 'том 1' },
+  { key: 'snare', label: 'малый' },
+  { key: 'tom2',  label: 'том 2' },
+  { key: 'tom3',  label: 'том 3' },
+  { key: 'kick',  label: 'бочка' },
+];
+
+let rhythms = [];
+
+const editorState = {
+  current: null,            // id of the rhythm being edited, or null = new
+  pattern: null,            // { voiceKey: number[16] (0|1) }
+  bpm: 100,
+  name: '',
+  mode: 'with-drums',
+};
+
+const rhythmPlayer = {
+  active: false,
+  cellIdx: 0,
+  nextTime: 0,
+  schedTimer: null,
+  rafId: 0,
+  cues: [],                 // {cellIdx, time}
+  highlightedCell: -1,
+};
+
+function emptyPattern() {
+  const p = {};
+  for (const v of RHYTHM_VOICES) p[v.key] = new Array(RHYTHM_CELLS).fill(0);
+  return p;
+}
+
+function loadRhythms() {
+  try {
+    const raw = localStorage.getItem(RHYTHMS_KEY);
+    if (!raw) return;
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) {
+      // Defensive: ensure each entry has all expected voices and 16 cells
+      rhythms = arr.map(r => ({
+        id: String(r.id || 'r-' + Date.now()),
+        name: String(r.name || 'Без названия'),
+        bpm: Number.isFinite(r.bpm) ? r.bpm : 100,
+        pattern: normalizePattern(r.pattern),
+      }));
+    }
+  } catch {}
+}
+
+function normalizePattern(raw) {
+  const p = emptyPattern();
+  if (!raw || typeof raw !== 'object') return p;
+  // Legacy migration: earlier versions used 'crash' instead of 'ride'.
+  // Treat the old key as if it were the new one.
+  if (Array.isArray(raw.crash) && !Array.isArray(raw.ride)) raw.ride = raw.crash;
+  for (const v of RHYTHM_VOICES) {
+    const arr = raw[v.key];
+    if (Array.isArray(arr)) {
+      for (let i = 0; i < RHYTHM_CELLS; i++) p[v.key][i] = arr[i] ? 1 : 0;
+    }
+  }
+  return p;
+}
+
+function persistRhythms() {
+  try { localStorage.setItem(RHYTHMS_KEY, JSON.stringify(rhythms)); } catch {}
+}
+
+function renderSavedRhythmsList() {
+  const root = $('rhythms-saved-list');
+  if (!root) return;
+  root.innerHTML = '';
+  for (const r of rhythms) {
+    const row = document.createElement('div');
+    row.className = 'rhythm-saved-row';
+    const isActive = r.id === editorState.current;
+    row.innerHTML = `
+      <button class="rhythm-saved-load${isActive ? ' rhythm-saved-active' : ''}">
+        <span class="rhythm-saved-name"></span>
+        <span class="rhythm-saved-bpm"></span>
+      </button>
+      <button class="rhythm-saved-del" aria-label="Удалить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        </svg>
+      </button>
+    `;
+    row.querySelector('.rhythm-saved-name').textContent = r.name;
+    row.querySelector('.rhythm-saved-bpm').textContent = `${r.bpm} BPM`;
+    row.querySelector('.rhythm-saved-load').addEventListener('click', () => {
+      loadRhythmIntoEditor(r.id);
+      closeRhythmsSheet();
+    });
+    row.querySelector('.rhythm-saved-del').addEventListener('click', () => {
+      if (confirm(`Удалить «${r.name}»?`)) deleteRhythm(r.id);
+    });
+    root.appendChild(row);
+  }
+}
+
+function openRhythmsSheet() {
+  $('rhythm-save-name').value = editorState.name || '';
+  renderSavedRhythmsList();
+  openModal('rhythms-modal');
+}
+
+function closeRhythmsSheet() {
+  closeModal('rhythms-modal');
+}
+
+function loadRhythmIntoEditor(id) {
+  const r = rhythms.find(x => x.id === id);
+  if (!r) return;
+  if (rhythmPlayer.active) stopRhythmPlayback();
+  editorState.current = r.id;
+  editorState.pattern = normalizePattern(r.pattern);
+  editorState.bpm = r.bpm;
+  editorState.name = r.name;
+  $('rhythm-bpm').value = r.bpm;
+  buildRhythmGrid();
+}
+
+function openRhythmEditor() {
+  // Always opens "fresh" — empty pattern, default BPM, no current id.
+  // To open a saved rhythm, use the bookmark icon → tap a saved row.
+  if (rhythmPlayer.active) stopRhythmPlayback();
+  editorState.current = null;
+  editorState.pattern = emptyPattern();
+  editorState.bpm = 100;
+  editorState.name = '';
+  editorState.mode = 'with-drums';
+
+  $('rhythm-bpm').value = editorState.bpm;
+  syncRhythmModeUI();
+  buildRhythmGrid();
+
+  const el = $('rhythm-editor');
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+}
+
+function closeRhythmEditor() {
+  if (rhythmPlayer.active) stopRhythmPlayback();
+  const el = $('rhythm-editor');
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+}
+
+function buildRhythmGrid() {
+  // Grid layout: 17 columns × 7 rows (1 label + 16 cells per voice row).
+  // Time runs LEFT-TO-RIGHT in the landscape view; voice labels in the
+  // auto column on the left. Children are emitted row-by-row so they
+  // flow naturally into the 17-col grid.
+  const grid = $('rhythm-grid');
+  grid.innerHTML = '';
+  for (const v of RHYTHM_VOICES) {
+    const label = document.createElement('div');
+    label.className = 'rhythm-voice-label';
+    label.textContent = v.label;
+    grid.appendChild(label);
+    for (let i = 0; i < RHYTHM_CELLS; i++) {
+      const cell = document.createElement('button');
+      cell.className = 'rhythm-cell';
+      cell.dataset.voice = v.key;
+      cell.dataset.cell = String(i);
+      if (i % 4 === 0) cell.dataset.beat = 'true';
+      if (editorState.pattern[v.key][i]) cell.classList.add('hit');
+      cell.addEventListener('click', () => toggleRhythmCell(v.key, i, cell));
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function toggleRhythmCell(voice, idx, cellEl) {
+  const next = editorState.pattern[voice][idx] ? 0 : 1;
+  editorState.pattern[voice][idx] = next;
+  cellEl.classList.toggle('hit', !!next);
+  // Tactile bump (Android only — iOS ignores)
+  try { navigator.vibrate?.(6); } catch {}
+}
+
+function clearRhythmGrid() {
+  for (const v of RHYTHM_VOICES) {
+    editorState.pattern[v.key].fill(0);
+  }
+  document.querySelectorAll('.rhythm-cell.hit').forEach(c => c.classList.remove('hit'));
+}
+
+function syncRhythmModeUI() {
+  const btn = $('rhythm-mode');
+  // aria-pressed="true" = drums on (lime), "false" = click-only (default).
+  btn.setAttribute('aria-pressed', editorState.mode === 'with-drums' ? 'true' : 'false');
+}
+
+function toggleRhythmMode() {
+  editorState.mode = editorState.mode === 'with-drums' ? 'click-only' : 'with-drums';
+  syncRhythmModeUI();
+}
+
+function saveRhythm() {
+  const name = ($('rhythm-save-name').value || '').trim() || 'Без названия';
+  const bpm = Math.max(30, Math.min(320, Number($('rhythm-bpm').value) || 100));
+  editorState.bpm = bpm;
+  editorState.name = name;
+  if (editorState.current) {
+    const r = rhythms.find(r => r.id === editorState.current);
+    if (r) {
+      r.name = name;
+      r.bpm = bpm;
+      r.pattern = normalizePattern(editorState.pattern);
+    }
+  } else {
+    const id = 'r-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    rhythms.push({ id, name, bpm, pattern: normalizePattern(editorState.pattern) });
+    editorState.current = id;
+  }
+  persistRhythms();
+  renderSavedRhythmsList();
+  showToast('Сохранено');
+}
+
+function deleteRhythm(id) {
+  rhythms = rhythms.filter(r => r.id !== id);
+  // If we just deleted the one being edited, drop the link so a future
+  // save creates a new entry rather than trying to update a deleted id.
+  if (editorState.current === id) editorState.current = null;
+  persistRhythms();
+  renderSavedRhythmsList();
+}
+
+// --- Drum voice synthesis ---
+// Each voice gets a distinct timbre. Noise-based for crash/hat/snare,
+// pitched oscillators for toms/kick. Built on top of the same audioCtx
+// that the metronome uses, so user volume / mute / mute-bar settings
+// don't apply here (the editor is its own playback context).
+
+let rhythmNoiseBuffer = null;
+function getRhythmNoise() {
+  if (rhythmNoiseBuffer) return rhythmNoiseBuffer;
+  const len = Math.floor(audioCtx.sampleRate * 1);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+  rhythmNoiseBuffer = buf;
+  return buf;
+}
+
+function playNoiseHit(time, opts) {
+  const { decay, hpFreq, lpFreq, gain } = opts;
+  const src = audioCtx.createBufferSource();
+  src.buffer = getRhythmNoise();
+  let node = src;
+  if (hpFreq) {
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = hpFreq;
+    node.connect(hp);
+    node = hp;
+  }
+  if (lpFreq) {
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = lpFreq;
+    node.connect(lp);
+    node = lp;
+  }
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(gain, time);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+  node.connect(g).connect(audioCtx.destination);
+  src.start(time);
+  src.stop(time + decay + 0.05);
+}
+
+function playPitchedHit(time, opts) {
+  const { freq, freqEnd, decay, gain, type = 'sine' } = opts;
+  const osc = audioCtx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, time);
+  if (freqEnd != null) {
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, time + decay * 0.6);
+  }
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(gain, time);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + decay + 0.05);
+}
+
+function playDrumVoice(voice, time) {
+  if (!audioCtx) return;
+  switch (voice) {
+    case 'ride':
+      // Ride cymbal: shorter than crash, with a clearer fundamental ping
+      // and metallic overtones layered on top.
+      playNoiseHit(time, { decay: 0.5, hpFreq: 5500, gain: 0.22 });
+      playPitchedHit(time, { freq: 1500, decay: 0.5, gain: 0.1, type: 'square' });
+      playPitchedHit(time, { freq: 2200, decay: 0.4, gain: 0.06, type: 'square' });
+      break;
+    case 'hat':   playNoiseHit(time, { decay: 0.06, hpFreq: 7000, gain: 0.3 }); break;
+    case 'snare':
+      playNoiseHit(time, { decay: 0.16, hpFreq: 1500, gain: 0.4 });
+      playPitchedHit(time, { freq: 220, decay: 0.1, gain: 0.25, type: 'triangle' });
+      break;
+    case 'tom1':  playPitchedHit(time, { freq: 280, freqEnd: 220, decay: 0.3, gain: 0.55, type: 'sine' }); break;
+    case 'tom2':  playPitchedHit(time, { freq: 180, freqEnd: 140, decay: 0.35, gain: 0.6, type: 'sine' }); break;
+    case 'tom3':  playPitchedHit(time, { freq: 110, freqEnd: 80,  decay: 0.4,  gain: 0.65, type: 'sine' }); break;
+    case 'kick':  playPitchedHit(time, { freq: 150, freqEnd: 45,  decay: 0.16, gain: 0.85, type: 'sine' }); break;
+  }
+}
+
+// --- Editor playback scheduler ---
+//
+// 16th-note cell scheduler with look-ahead, similar in spirit to the main
+// metronome. Each tick:
+//   - if cellIdx % 4 === 0, play metronome click (accent on cell 0, beat
+//     otherwise) — always, in both modes
+//   - if mode === 'with-drums', play any voices marked at this cell
+//   - queue a visual highlight cue
+async function startRhythmPlayback() {
+  await ensureAudio();
+  if (audioCtx.state !== 'running') return;
+  rhythmPlayer.active = true;
+  rhythmPlayer.cellIdx = 0;
+  rhythmPlayer.nextTime = audioCtx.currentTime + 0.08;
+  rhythmPlayer.cues = [];
+  rhythmTickScheduler();
+  rhythmVisualLoop();
+  $('rhythm-play').classList.add('playing');
+  $('rhythm-play').querySelector('.rhythm-play-icon').textContent = '■';
+}
+
+function stopRhythmPlayback() {
+  rhythmPlayer.active = false;
+  if (rhythmPlayer.schedTimer) { clearTimeout(rhythmPlayer.schedTimer); rhythmPlayer.schedTimer = null; }
+  if (rhythmPlayer.rafId) { cancelAnimationFrame(rhythmPlayer.rafId); rhythmPlayer.rafId = 0; }
+  rhythmPlayer.cues = [];
+  clearRhythmCursor();
+  $('rhythm-play').classList.remove('playing');
+  $('rhythm-play').querySelector('.rhythm-play-icon').textContent = '▶';
+}
+
+function rhythmTickScheduler() {
+  if (!rhythmPlayer.active) return;
+  const SCHED_AHEAD = 0.1;
+  while (rhythmPlayer.nextTime < audioCtx.currentTime + SCHED_AHEAD) {
+    const idx = rhythmPlayer.cellIdx % RHYTHM_CELLS;
+    const t = rhythmPlayer.nextTime;
+    if (editorState.mode === 'with-drums') {
+      // Listening to the pattern — drum voices only, no metronome click
+      // (click would mask the groove).
+      for (const v of RHYTHM_VOICES) {
+        if (editorState.pattern[v.key][idx]) playDrumVoice(v.key, t);
+      }
+    } else {
+      // Practicing — only the metronome click on every 4th cell, drums
+      // are silent so the user plays them.
+      if (idx % 4 === 0) {
+        const beatType = idx === 0 ? 'accent' : 'beat';
+        playClick(beatType, t);
+      }
+    }
+    rhythmPlayer.cues.push({ cellIdx: idx, time: t });
+    const secPerCell = (60.0 / editorState.bpm) / 4;
+    rhythmPlayer.nextTime += secPerCell;
+    rhythmPlayer.cellIdx++;
+  }
+  rhythmPlayer.schedTimer = setTimeout(rhythmTickScheduler, 25);
+}
+
+function rhythmVisualLoop() {
+  if (!rhythmPlayer.active) return;
+  const now = audioCtx.currentTime;
+  // Promote the latest cue whose time has passed
+  while (rhythmPlayer.cues.length && rhythmPlayer.cues[0].time <= now) {
+    const cue = rhythmPlayer.cues.shift();
+    setRhythmCursor(cue.cellIdx);
+  }
+  rhythmPlayer.rafId = requestAnimationFrame(rhythmVisualLoop);
+}
+
+function setRhythmCursor(cellIdx) {
+  if (rhythmPlayer.highlightedCell === cellIdx) return;
+  clearRhythmCursor();
+  document.querySelectorAll(`.rhythm-cell[data-cell="${cellIdx}"]`)
+    .forEach(c => c.classList.add('playing'));
+  rhythmPlayer.highlightedCell = cellIdx;
+}
+
+function clearRhythmCursor() {
+  document.querySelectorAll('.rhythm-cell.playing').forEach(c => c.classList.remove('playing'));
+  rhythmPlayer.highlightedCell = -1;
+}
+
+function toggleRhythmPlay() {
+  if (rhythmPlayer.active) stopRhythmPlayback();
+  else startRhythmPlayback();
+}
+
 // --- Init ---
 
 function init() {
@@ -2402,6 +2854,7 @@ function init() {
   renderBuiltinPresets();
   renderUserPresets();
   renderProgramTiles();
+  loadRhythms();
   updateSubDisplay();
   updateTimeDisplay();
   updatePlayButton();

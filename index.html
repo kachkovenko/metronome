@@ -155,6 +155,11 @@
         <div class="tab-section">
           <h2 class="tab-section-title">Тренажёры</h2>
 
+          <button class="trainer-row" id="open-rhythm-builder">
+            <span>Конструктор ритма</span>
+          </button>
+
+
           <details>
             <summary>Тренажёр ритма (бета)</summary>
             <p class="muted small">Слушает микрофон и показывает на главном экране, насколько точно ты попадаешь в долю в реальном времени. <strong>Нужны наушники</strong> — иначе микрофон будет ловить сам метроном.</p>
@@ -510,6 +515,87 @@
         <h3 class="runner-transition-title">Программа завершена</h3>
         <p class="runner-transition-meta" id="runner-finish-meta"></p>
         <button class="runner-transition-btn" id="runner-finish-close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rhythm editor — fullscreen overlay. Laid out as LANDSCAPE
+       (3-column grid: meta-strip | grid | actions-strip), copying the
+       exact structural pattern of #flash-screen. On portrait phones
+       it auto-rotates 90° clockwise so the user just turns the phone
+       left to view it horizontally. -->
+  <div id="rhythm-editor" class="rhythm-editor" aria-hidden="true">
+    <aside class="rhythm-meta">
+      <button class="rhythm-icon-btn" id="rhythm-presets-btn" aria-label="Сохранённые ритмы">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
+      <div class="rhythm-meta-item rhythm-bpm-stepper">
+        <button class="rhythm-bpm-arrow" id="rhythm-bpm-up" aria-label="+1 BPM">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 15 12 9 18 15"/>
+          </svg>
+        </button>
+        <input id="rhythm-bpm" type="number" min="30" max="320" value="100" inputmode="numeric">
+        <button class="rhythm-bpm-arrow" id="rhythm-bpm-down" aria-label="−1 BPM">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        <span class="rhythm-meta-label">BPM</span>
+      </div>
+      <div class="rhythm-meta-item">
+        <span class="rhythm-meta-value">4/4</span>
+        <span class="rhythm-meta-label">размер</span>
+      </div>
+      <div class="rhythm-meta-item">
+        <span class="rhythm-meta-value rhythm-meta-value-symbol">♩</span>
+        <span class="rhythm-meta-label">деления</span>
+      </div>
+    </aside>
+
+    <main class="rhythm-editor-body">
+      <div class="rhythm-grid" id="rhythm-grid"></div>
+    </main>
+
+    <aside class="rhythm-actions">
+      <button class="rhythm-icon-btn" id="rhythm-clear" aria-label="Очистить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        </svg>
+      </button>
+      <button class="rhythm-play-btn" id="rhythm-play" aria-label="Воспроизведение">
+        <span class="rhythm-play-icon">▶</span>
+      </button>
+      <button class="rhythm-icon-btn rhythm-mode-btn" id="rhythm-mode" aria-label="Звуки ударов" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+      </button>
+      <button class="rhythm-icon-btn" id="rhythm-editor-close" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+    </aside>
+  </div>
+
+  <!-- Saved rhythms sheet — opens via the bookmark icon in the editor.
+       Mirrors the structure of #presets-modal so it feels like the same
+       UI pattern. -->
+  <div id="rhythms-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Сохранённые ритмы</h3>
+      <div id="rhythms-saved-list" class="rhythms-saved-list"></div>
+      <div class="rhythm-save-form">
+        <input id="rhythm-save-name" type="text" placeholder="Название текущего ритма" maxlength="40">
+        <button class="rhythm-save-form-btn" id="rhythm-save-btn">Сохранить</button>
       </div>
     </div>
   </div>
