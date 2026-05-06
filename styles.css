@@ -1156,6 +1156,70 @@ details > *:last-child { padding-bottom: 16px; }
   color: var(--muted);
 }
 
+/* User-imported programs list — same row pattern as the saved-rhythms
+   sheet: a wide load-button on the left + a square delete-button on
+   the right. */
+.user-programs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.user-program-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.user-program-load {
+  background: var(--card);
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.user-program-load:active { transform: scale(0.98); background: var(--card-2); }
+
+.user-program-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-program-duration {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.user-program-delete {
+  background: var(--card);
+  color: var(--muted);
+  border: none;
+  border-radius: var(--radius-md);
+  width: 44px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.06s ease;
+}
+
+.user-program-delete:active { transform: scale(0.94); background: var(--card-2); color: var(--fg); }
+.user-program-delete svg { width: 18px; height: 18px; }
+
 /* Difficulty/duration option list inside the bottom sheet — same look
    as the count-in / rhythm pickers. */
 .program-picker-options {
@@ -2550,6 +2614,112 @@ details a {
   text-decoration-color: var(--muted);
   text-underline-offset: 3px;
 }
+
+/* === Import modals === */
+
+/* Big primary "paste from clipboard" button — the recommended path
+   since iOS PWAs can't intercept https:// deeplinks. */
+.import-clipboard-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 6px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.06s ease;
+}
+
+.import-clipboard-btn svg { width: 18px; height: 18px; }
+.import-clipboard-btn:active { transform: scale(0.97); }
+
+.import-or {
+  margin: 14px 0 6px;
+  text-align: center;
+}
+
+.import-input {
+  width: 100%;
+  background: var(--card-2);
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  outline: none;
+}
+
+.import-error {
+  margin: 8px 0 0;
+  color: #e64a4a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.import-submit-btn {
+  width: 100%;
+  background: var(--card-2);
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-top: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.import-submit-btn:active { transform: scale(0.97); background: var(--card-3); }
+
+/* Confirm sheet — Cancel + Save side-by-side */
+.import-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.import-cancel-btn {
+  flex: 1;
+  background: var(--card-2);
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.import-save-btn {
+  flex: 1;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.06s ease;
+}
+
+.import-cancel-btn:active,
+.import-save-btn:active { transform: scale(0.97); }
 
 /* Settings reset — destructive action, paint it red. */
 .settings-reset-btn {

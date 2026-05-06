@@ -171,6 +171,13 @@
           </div>
         </div>
 
+        <!-- Мои программы — appears only when at least one user-imported
+             program exists. Populated by renderUserPrograms(). -->
+        <div class="tab-section" id="user-programs-section" hidden>
+          <h2 class="tab-section-title">Мои программы</h2>
+          <div id="user-programs-list" class="user-programs-list"></div>
+        </div>
+
         <div class="tab-section">
           <h2 class="tab-section-title">Тренажёры</h2>
 
@@ -552,6 +559,45 @@
         <button class="program-picker-option" data-duration="15">15 минут</button>
         <button class="program-picker-option" data-duration="30">30 минут</button>
         <button class="program-picker-option" data-duration="60">60 минут</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import: paste-input sheet (manual flow). Accepts raw JSON,
+       a full deeplink URL, or bare base64 — parser figures it out. -->
+  <div id="import-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3>Импорт программы</h3>
+      <p class="muted small">Скопируй ссылку или JSON, который дал Claude, и вставь сюда.</p>
+      <button class="import-clipboard-btn" id="import-paste">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span>Вставить из буфера обмена</span>
+      </button>
+      <p class="muted small import-or">или вставь вручную:</p>
+      <textarea id="import-input" class="import-input" rows="5" placeholder="Ссылка, JSON или base64…"></textarea>
+      <p class="import-error" id="import-error" hidden></p>
+      <button class="import-submit-btn" id="import-submit">Далее</button>
+    </div>
+  </div>
+
+  <!-- Import: confirm sheet. Used by both the manual paste flow (after
+       parsing) and the ?import= deeplink at boot. -->
+  <div id="import-confirm-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3 id="import-confirm-title">Импортировать программу?</h3>
+      <p class="program-preview-meta" id="import-confirm-meta"></p>
+      <p class="program-preview-description" id="import-confirm-description" hidden></p>
+      <ol class="program-preview-blocks" id="import-confirm-blocks"></ol>
+      <div class="import-actions">
+        <button class="import-cancel-btn" id="import-confirm-cancel">Отмена</button>
+        <button class="import-save-btn" id="import-confirm-save">Сохранить</button>
       </div>
     </div>
   </div>

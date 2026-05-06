@@ -1,7 +1,7 @@
 // Metronome — Web Audio API scheduler with lookahead.
 // Reference: Chris Wilson, "A Tale of Two Clocks".
 
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.22.0';
 
 const state = {
   bpm: 100,
@@ -68,6 +68,7 @@ const THEME_KEY = 'metronome.theme';
 const SOUND_ACCENT_KEY = 'metronome.sound-accent';
 const SOUND_BEAT_KEY = 'metronome.sound-beat';
 const ANALYTICS_DISABLED_KEY = 'metronome.analytics-disabled';
+const USER_PROGRAMS_KEY = 'metronome.user-programs';
 
 // Settings keys cleared by "Сброс настроек". User content (saved
 // rhythms, BPM presets) is intentionally NOT in this list.
@@ -1302,7 +1303,11 @@ function bind() {
 
   // Programs
   $('program-create').addEventListener('click', () => showToast('Эта функция пока не работает'));
-  $('program-import').addEventListener('click', () => showToast('Эта функция пока не работает'));
+  $('program-import').addEventListener('click', openImportModal);
+  $('import-paste').addEventListener('click', pasteImportFromClipboard);
+  $('import-submit').addEventListener('click', submitImport);
+  $('import-confirm-cancel').addEventListener('click', cancelImportConfirm);
+  $('import-confirm-save').addEventListener('click', confirmImportSave);
   $('program-difficulty-btn').addEventListener('click', openProgramDifficultySheet);
   $('program-duration-btn').addEventListener('click', openProgramDurationSheet);
   document.querySelectorAll('#program-difficulty-modal .program-picker-option').forEach(b => {
@@ -2104,8 +2109,280 @@ const programState = {
   saved: null,                  // metronome state snapshot for exit restore
 };
 
+// User-imported programs (separate from the built-in PROGRAMS catalog).
+// Persisted in localStorage; rendered in their own "Мои программы" plate
+// under the difficulty/duration picker.
+let userPrograms = [];
+
+function loadUserPrograms() {
+  try {
+    const raw = localStorage.getItem(USER_PROGRAMS_KEY);
+    if (!raw) return;
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) userPrograms = arr.filter(p => p && p.id);
+  } catch {}
+}
+
+function saveUserPrograms() {
+  try { localStorage.setItem(USER_PROGRAMS_KEY, JSON.stringify(userPrograms)); } catch {}
+}
+
+function renderUserPrograms() {
+  const section = $('user-programs-section');
+  const list = $('user-programs-list');
+  if (!section || !list) return;
+  list.innerHTML = '';
+  if (!userPrograms.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  for (const p of userPrograms) {
+    const row = document.createElement('div');
+    row.className = 'user-program-row';
+    const totalMin = Math.round(totalProgramSeconds(p) / 60) || p.duration || 0;
+    row.innerHTML = `
+      <button class="user-program-load">
+        <span class="user-program-name"></span>
+        <span class="user-program-duration"></span>
+      </button>
+      <button class="user-program-delete" aria-label="Удалить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        </svg>
+      </button>
+    `;
+    row.querySelector('.user-program-name').textContent = p.name;
+    row.querySelector('.user-program-duration').textContent = `${totalMin} мин · ${p.blocks.length} блоков`;
+    row.querySelector('.user-program-load').addEventListener('click', () => openProgramPreview(p.id));
+    row.querySelector('.user-program-delete').addEventListener('click', () => {
+      if (confirm(`Удалить «${p.name}»?`)) removeUserProgram(p.id);
+    });
+    list.appendChild(row);
+  }
+}
+
+function addUserProgram(p) {
+  userPrograms.push(p);
+  saveUserPrograms();
+  renderUserPrograms();
+}
+
+function removeUserProgram(id) {
+  userPrograms = userPrograms.filter(p => p.id !== id);
+  saveUserPrograms();
+  renderUserPrograms();
+}
+
+// --- Import: parse + validate program packages ---
+//
+// Accepts three input shapes:
+//   1) Raw JSON string starting with `{`
+//   2) Full deeplink URL containing ?import=<base64-json>
+//   3) Bare base64-encoded JSON
+//
+// Returns the parsed program object on success; throws an Error with a
+// short Russian message on failure (shown to the user in a toast).
+const PROGRAM_BLOCK_TYPES = new Set(['warmup', 'rudiment', 'coordination', 'song', 'cooldown']);
+const PROGRAM_EXERCISE_KINDS = new Set(['sticking', 'groove', 'free', 'song']);
+const PROGRAM_SCHEMA_VERSION = 1;
+
+function decodeBase64Json(b64) {
+  // atob accepts standard base64. We strip whitespace and apply padding
+  // so that base64 strings copied from anywhere (including URL-safe
+  // variants the model may emit) decode cleanly.
+  let s = String(b64).replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  // atob gives latin-1 bytes; convert to UTF-8 string for JSON.parse.
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const text = new TextDecoder('utf-8').decode(bytes);
+  return JSON.parse(text);
+}
+
+function parseImportInput(raw) {
+  const text = String(raw || '').trim();
+  if (!text) throw new Error('Пусто');
+  // Direct JSON
+  if (text.startsWith('{')) {
+    try { return JSON.parse(text); }
+    catch { throw new Error('JSON повреждён'); }
+  }
+  // URL with ?import=
+  if (/^https?:\/\//i.test(text) || text.includes('?import=')) {
+    try {
+      const url = new URL(text, location.origin);
+      const param = url.searchParams.get('import');
+      if (!param) throw new Error('В ссылке нет параметра import=');
+      return decodeBase64Json(param);
+    } catch (e) {
+      if (e.message === 'В ссылке нет параметра import=') throw e;
+      throw new Error('Ссылка повреждена');
+    }
+  }
+  // Otherwise assume bare base64
+  try { return decodeBase64Json(text); }
+  catch { throw new Error('Не удалось распознать формат — ожидается JSON, ссылка или base64'); }
+}
+
+function validateProgram(p) {
+  if (!p || typeof p !== 'object') throw new Error('Программа не является объектом');
+  if (p.schemaVersion !== PROGRAM_SCHEMA_VERSION) {
+    throw new Error(`Несовместимая версия формата (нужна ${PROGRAM_SCHEMA_VERSION})`);
+  }
+  if (typeof p.name !== 'string' || !p.name.trim()) throw new Error('Нет названия программы');
+  if (!Number.isFinite(p.duration) || p.duration <= 0) throw new Error('Не указана длительность');
+  if (!Array.isArray(p.blocks) || !p.blocks.length) throw new Error('Программа должна содержать хотя бы один блок');
+  p.blocks.forEach((b, idx) => {
+    const where = `блок ${idx + 1}`;
+    if (!b || typeof b !== 'object') throw new Error(`${where}: не объект`);
+    if (!PROGRAM_BLOCK_TYPES.has(b.type)) throw new Error(`${where}: неизвестный type «${b.type}»`);
+    if (typeof b.title !== 'string' || !b.title.trim()) throw new Error(`${where}: нет title`);
+    if (!Number.isFinite(b.duration) || b.duration <= 0) throw new Error(`${where}: некорректный duration`);
+    if (!Number.isFinite(b.bpm) || b.bpm < 30 || b.bpm > 320) throw new Error(`${where}: bpm вне диапазона 30–320`);
+    if (!b.sig || !Number.isFinite(b.sig.num) || !Number.isFinite(b.sig.den)) throw new Error(`${where}: некорректный sig`);
+    if (![1, 2, 3, 4].includes(b.sub)) throw new Error(`${where}: sub должен быть 1, 2, 3 или 4`);
+    if (!b.exercise || typeof b.exercise !== 'object') throw new Error(`${where}: нет exercise`);
+    if (!PROGRAM_EXERCISE_KINDS.has(b.exercise.kind)) throw new Error(`${where}: неизвестный exercise.kind «${b.exercise.kind}»`);
+    if (b.bpmRamp != null) {
+      const r = b.bpmRamp;
+      if (!Number.isFinite(r.to) || !Number.isFinite(r.step) || !Number.isFinite(r.every)) {
+        throw new Error(`${where}: bpmRamp должен содержать to, step, every`);
+      }
+    }
+  });
+  return p;
+}
+
+// Convert a validated package into the internal program shape (assigns
+// an id; user programs don't have a difficulty).
+function packageToProgram(pkg) {
+  return {
+    id: 'user-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    name: pkg.name.trim(),
+    duration: pkg.duration,
+    description: pkg.description || '',
+    blocks: pkg.blocks,
+  };
+}
+
+// --- Import modal flow ---
+//
+// Two stages: an input sheet (paste raw JSON / link / base64), then a
+// confirm sheet showing the parsed program preview. The same confirm
+// sheet is reused by the deeplink boot handler.
+let pendingImportProgram = null;
+
+function openImportModal() {
+  const input = $('import-input');
+  if (input) input.value = '';
+  showImportError('');
+  openModal('import-modal');
+}
+
+function showImportError(msg) {
+  const el = $('import-error');
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.hidden = false;
+  } else {
+    el.textContent = '';
+    el.hidden = true;
+  }
+}
+
+async function pasteImportFromClipboard() {
+  showImportError('');
+  // iOS / older browsers: clipboard.readText is gated behind secure
+  // context (HTTPS) and may be missing on plain http:// LAN testing.
+  // In that case fall back to focusing the textarea so the user can
+  // do a long-tap → Paste manually.
+  if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+    showImportError('Браузер не разрешает чтение буфера. Сделай длинный тап по полю ниже и выбери «Вставить».');
+    $('import-input').focus();
+    return;
+  }
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    showImportError('iOS не разрешил доступ к буферу. Сделай длинный тап по полю ниже и выбери «Вставить».');
+    $('import-input').focus();
+    return;
+  }
+  if (!text || !text.trim()) {
+    showImportError('Буфер обмена пуст. Скопируй ссылку или JSON и попробуй ещё раз.');
+    return;
+  }
+  $('import-input').value = text;
+  // Auto-submit so the user goes straight from "Из буфера" to the
+  // preview sheet — no second tap on "Далее" needed.
+  submitImport();
+}
+
+function submitImport() {
+  showImportError('');
+  const raw = $('import-input').value;
+  let pkg;
+  try {
+    pkg = parseImportInput(raw);
+    validateProgram(pkg);
+  } catch (e) {
+    showImportError(e.message || 'Не удалось импортировать');
+    return;
+  }
+  closeModal('import-modal');
+  showImportConfirm(pkg);
+}
+
+function showImportConfirm(pkg) {
+  const program = packageToProgram(pkg);
+  pendingImportProgram = program;
+  $('import-confirm-title').textContent = `Импортировать «${program.name}»?`;
+  const totalMin = Math.round(totalProgramSeconds(program) / 60) || program.duration || 0;
+  $('import-confirm-meta').textContent = `${program.blocks.length} блоков · итого ≈ ${totalMin} мин`;
+  const desc = $('import-confirm-description');
+  desc.textContent = program.description || '';
+  desc.hidden = !program.description;
+  const list = $('import-confirm-blocks');
+  list.innerHTML = '';
+  program.blocks.forEach(block => {
+    const li = document.createElement('li');
+    li.className = 'program-preview-block';
+    const min = Math.round((block.duration || 0) / 60);
+    const minTxt = block.userPaced ? `≈ ${min} мин` : `${min} мин`;
+    const ramp = block.bpmRamp ? `${block.bpm}→${block.bpmRamp.to}` : `${block.bpm}`;
+    const typeLabel = BLOCK_TYPE_LABELS[block.type] || '';
+    li.innerHTML = `
+      <span class="program-preview-block-type"></span>
+      <span class="program-preview-block-title"></span>
+      <span class="program-preview-block-meta"></span>
+    `;
+    li.querySelector('.program-preview-block-type').textContent = typeLabel;
+    li.querySelector('.program-preview-block-title').textContent = block.title;
+    li.querySelector('.program-preview-block-meta').textContent = `${minTxt} · ${ramp} BPM`;
+    list.appendChild(li);
+  });
+  openModal('import-confirm-modal');
+}
+
+function confirmImportSave() {
+  if (!pendingImportProgram) return;
+  addUserProgram(pendingImportProgram);
+  showToast(`«${pendingImportProgram.name}» добавлена в Мои программы`);
+  pendingImportProgram = null;
+  closeModal('import-confirm-modal');
+}
+
+function cancelImportConfirm() {
+  pendingImportProgram = null;
+  closeModal('import-confirm-modal');
+}
+
 function getProgramById(id) {
-  return PROGRAMS.find(p => p.id === id);
+  return PROGRAMS.find(p => p.id === id) || userPrograms.find(p => p.id === id);
 }
 
 function totalProgramSeconds(p) {
@@ -3188,6 +3465,8 @@ function init() {
   renderBuiltinPresets();
   renderUserPresets();
   syncProgramPickerUI();
+  loadUserPrograms();
+  renderUserPrograms();
   loadRhythms();
   updateSubDisplay();
   updateTimeDisplay();
@@ -3195,8 +3474,34 @@ function init() {
   updateCountinUI();
   updateSoundPickerUI();
   setupVersionAndUpdate();
+  handleImportDeeplink();
   // Wheel must build after layout settles so clientWidth is correct
   requestAnimationFrame(buildBpmWheel);
+}
+
+// If the page was opened with ?import=<base64>, parse it and show the
+// confirm sheet so the user can preview and save the program.
+// Replaces the URL afterward so a refresh doesn't re-trigger.
+function handleImportDeeplink() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const param = params.get('import');
+    if (!param) return;
+    let pkg;
+    try {
+      pkg = decodeBase64Json(param);
+      validateProgram(pkg);
+    } catch (e) {
+      showToast(`Не удалось импортировать: ${e.message || 'формат повреждён'}`);
+      history.replaceState({}, '', location.pathname);
+      return;
+    }
+    history.replaceState({}, '', location.pathname);
+    // Switch to Тренировки tab so the user sees what they're importing
+    // into.
+    switchTab('training');
+    showImportConfirm(pkg);
+  } catch {}
 }
 
 init();
